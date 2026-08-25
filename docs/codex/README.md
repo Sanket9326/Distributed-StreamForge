@@ -13,12 +13,11 @@ how to navigate and evolve StreamForge.
 
 ## Change checklist
 
-- Keep changes inside the owning service unless a contract truly spans boundaries.
+- Treat the current service folders as proposals rather than fixed decisions.
+- Keep code and configuration placeholders empty until implementation is requested.
 - Update tests and documentation with behavioral changes.
-- Treat message handlers as idempotent and make retry behavior explicit.
-- Preserve correlation IDs across HTTP calls, messages, and worker jobs.
 - Never expose secrets, raw credentials, signing keys, or private media.
-- Run the smallest relevant test first, then the solution-level checks.
+- Do not invent build commands, infrastructure products, or runtime assumptions.
 
 ## Handoff notes
 

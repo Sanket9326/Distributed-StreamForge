@@ -1,30 +1,16 @@
 # StreamForge
 
-StreamForge is a learning-focused, production-shaped video platform built around
-.NET 10 microservices, an Angular/TypeScript web client, FFmpeg workers, HLS,
-live streaming, caching, observability, and fault-tolerant distributed workflows.
+StreamForge is a learning-focused distributed video platform planned around
+.NET 10 microservices, an Angular/TypeScript web client, FFmpeg, HLS, Docker,
+live streaming, caching, observability, and fault-tolerant workflows.
 
 ## Repository status
 
-The repository currently defines architecture boundaries and local development
-infrastructure. Application projects will be generated incrementally so each
-service starts with an explicit responsibility and contract.
+This repository currently contains only the proposed folder boundaries and
+supporting documentation. It intentionally has no generated applications,
+solution files, package manifests, Docker configuration, databases, brokers,
+storage products, or executable development setup. Those choices will be made
+and documented incrementally.
 
-## Planned request flow
-
-```text
-Angular client -> Gateway -> Domain APIs -> PostgreSQL / Redis
-                           -> RabbitMQ -> Processing workers -> HLS storage/CDN
-Live ingest -> Live service -> Transcoding/packaging -> HLS delivery
-```
-
-## Local prerequisites
-
-- .NET SDK 10 (pinned in `global.json`)
-- Node.js and an Angular CLI version that supports it
-- Docker Desktop with Compose
-- FFmpeg for local worker development
-
-Copy `.env.example` to `.env`, then run `docker compose up -d` to start the
-local PostgreSQL, Redis, and RabbitMQ dependencies. See `docs/development/setup.md`
-and `docs/codex/README.md` before implementing the first vertical slice.
+See `docs/architecture/README.md` for the placeholder service map and
+`docs/codex/README.md` for contributor context.

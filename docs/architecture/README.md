@@ -1,9 +1,8 @@
 # Architecture
 
-StreamForge uses independently deployable services and queue-backed workers.
-Each service owns its persistence and publishes versioned integration events.
-Start with a modular, observable local system; split and scale only from measured
-pressure rather than assumed traffic.
+This is a placeholder service map derived from the project goals. It does not
+select databases, messaging, storage, communication patterns, deployment units,
+or cloud services. Record those decisions in `decisions/` before implementation.
 
 ## Boundaries
 
@@ -19,5 +18,5 @@ pressure rather than assumed traffic.
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |
 
-The first vertical slice should be upload -> queued job -> transcode -> publish
--> playback. Record decisions that change these boundaries in `decisions/`.
+These boundaries may change as the architecture is designed. Keep their folders
+empty until the corresponding implementation is explicitly planned.

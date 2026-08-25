@@ -1,8 +1,5 @@
 # API and Event Contracts
 
-Store human-readable API notes and exported OpenAPI documents here. Version
-integration events in `src/backend/shared/contracts/`, preserving backward
-compatibility while producers and consumers deploy independently.
-
-Every external API or event change must describe authentication, idempotency,
-error behavior, pagination where relevant, and an example request or payload.
+This directory is reserved for future HTTP API, streaming, and inter-service
+contract documentation. No protocol, schema format, versioning strategy, or
+communication pattern has been selected yet.
