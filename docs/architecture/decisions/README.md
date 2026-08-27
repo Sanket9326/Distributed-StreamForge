@@ -3,6 +3,10 @@
 Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 `Superseded`, or `Rejected`.
 
+## Accepted decisions
+
+- [0001: Initial upload microservices](0001-initial-upload-microservices.md)
+
 ```markdown
 # NNNN: Decision title
 

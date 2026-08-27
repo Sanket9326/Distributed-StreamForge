@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/backend/gateway/StreamForge.Gateway.Api.csproj" />
+    <Project Path="src/backend/services/upload/StreamForge.Upload.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/backend/integration/StreamForge.Gateway.IntegrationTests/StreamForge.Gateway.IntegrationTests.csproj" />
+    <Project Path="tests/backend/integration/StreamForge.Upload.IntegrationTests/StreamForge.Upload.IntegrationTests.csproj" />
+    <Project Path="tests/backend/unit/StreamForge.Upload.UnitTests/StreamForge.Upload.UnitTests.csproj" />
+  </Folder>
+</Solution>

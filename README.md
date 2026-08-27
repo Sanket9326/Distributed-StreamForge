@@ -1,16 +1,34 @@
 # StreamForge
 
-StreamForge is a learning-focused distributed video platform planned around
-.NET 10 microservices, an Angular/TypeScript web client, FFmpeg, HLS, Docker,
-live streaming, caching, observability, and fault-tolerant workflows.
+StreamForge is a learning-focused distributed video platform built with .NET
+microservices and an Angular web client.
 
-## Repository status
+## Implemented slice
 
-This repository currently contains only the proposed folder boundaries and
-supporting documentation. It intentionally has no generated applications,
-solution files, package manifests, Docker configuration, databases, brokers,
-storage products, or executable development setup. Those choices will be made
-and documented incrementally.
+The first vertical slice accepts one source video through three independently
+deployable components:
 
-See `docs/architecture/README.md` for the placeholder service map and
-`docs/codex/README.md` for contributor context.
+```text
+Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service -> owned volume
+```
+
+The Upload service streams MP4, MOV, WebM, and MKV files up to 1 GB into its own
+storage. It does not yet catalog, transcode, or serve those files.
+
+## Quick start with Docker
+
+Start Docker Desktop, then run:
+
+```powershell
+docker compose -f infra/docker/compose.yml up --build
+```
+
+Open `http://localhost:8080`. Stop the services without deleting uploaded files:
+
+```powershell
+docker compose -f infra/docker/compose.yml down
+```
+
+See [development setup](docs/development/setup.md) for local commands and volume
+cleanup, [API documentation](docs/api/README.md) for the HTTP contract, and
+[architecture](docs/architecture/README.md) for service ownership.

@@ -1,0 +1,152 @@
+<main class="shell">
+  <header class="masthead">
+    <a class="brand" href="/" aria-label="StreamForge home">
+      <span class="brand-mark" aria-hidden="true"> <span></span><span></span><span></span> </span>
+      <span>StreamForge</span>
+    </a>
+    <span class="environment"><i></i> Local workspace</span>
+  </header>
+
+  <section class="hero" aria-labelledby="page-title">
+    <p class="eyebrow">UPLOAD SERVICE · 01</p>
+    <h1 id="page-title">Send your source.<br /><em>We’ll take it from here.</em></h1>
+    <p class="intro">
+      Add one source video to the upload service. Your original file is stored untouched and ready
+      for future processing workflows.
+    </p>
+  </section>
+
+  <section class="workspace" aria-label="Video uploader">
+    <div
+      class="drop-zone"
+      [class.dragging]="isDragging()"
+      [class.has-file]="selectedFile()"
+      [class.locked]="state() === 'uploading'"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+    >
+      <input
+        #fileInput
+        id="video-file"
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mkv"
+        [disabled]="state() === 'uploading'"
+        (change)="onFileSelected($event)"
+      />
+
+      @if (!selectedFile()) {
+        <label for="video-file" class="drop-label">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5V19h14v-3.5" />
+            </svg>
+          </span>
+          <strong>Drop a video here</strong>
+          <span>or <u>browse your files</u></span>
+        </label>
+      } @else {
+        <div class="file-card">
+          <span class="file-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M10 13l5 3-5 3z" /></svg>
+          </span>
+          <div class="file-copy">
+            <strong>{{ selectedFile()?.name }}</strong>
+            <span>{{ formattedSize() }} · Source video</span>
+          </div>
+          @if (state() !== 'uploading') {
+            <button
+              class="icon-button"
+              type="button"
+              aria-label="Remove selected file"
+              (click)="reset()"
+            >
+              ×
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="rules" aria-label="Upload requirements">
+      <span>MP4 · MOV · WEBM · MKV</span>
+      <span>MAXIMUM 1 GB</span>
+      <span>ONE FILE AT A TIME</span>
+    </div>
+
+    @if (state() === 'ready') {
+      <button class="primary-action" type="button" (click)="startUpload()">
+        Upload video
+        <span aria-hidden="true">↗</span>
+      </button>
+    }
+
+    @if (state() === 'uploading') {
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-heading">
+          <span>Uploading source</span>
+          <strong>{{ progress() }}%</strong>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          aria-label="Upload progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="progress()"
+        >
+          <span [style.width.%]="progress()"></span>
+        </div>
+        <button class="text-action" type="button" (click)="cancelUpload()">Cancel upload</button>
+      </div>
+    }
+
+    @if (state() === 'error') {
+      <div class="status-panel error" role="alert">
+        <span class="status-symbol" aria-hidden="true">!</span>
+        <div>
+          <strong>Upload not completed</strong>
+          <p>{{ errorMessage() }}</p>
+        </div>
+      </div>
+      <div class="action-row">
+        @if (selectedFile()) {
+          <button class="primary-action compact" type="button" (click)="retryUpload()">
+            Try again
+          </button>
+        }
+        <button class="secondary-action" type="button" (click)="reset()">
+          Choose another file
+        </button>
+      </div>
+    }
+
+    @if (receipt(); as result) {
+      <div class="status-panel success" role="status">
+        <span class="status-symbol" aria-hidden="true">✓</span>
+        <div>
+          <strong>Source stored successfully</strong>
+          <p>The upload service received {{ result.fileName }}.</p>
+        </div>
+      </div>
+      <dl class="receipt">
+        <div>
+          <dt>Upload ID</dt>
+          <dd>{{ result.id }}</dd>
+        </div>
+        <div>
+          <dt>Correlation</dt>
+          <dd>{{ result.correlationId }}</dd>
+        </div>
+      </dl>
+      <button class="secondary-action full" type="button" (click)="reset()">
+        Upload another video
+      </button>
+    }
+  </section>
+
+  <footer>
+    <span>Original files only · No transcoding yet</span>
+    <span>Gateway → Upload Service</span>
+  </footer>
+</main>

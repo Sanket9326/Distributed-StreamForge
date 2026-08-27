@@ -14,9 +14,13 @@ add generated projects or select infrastructure without an explicit task.
 
 ## Build, Test, and Development Commands
 
-There are currently no build, test, Docker, or development commands. Do not add
-placeholder commands that cannot run. Document commands here and in `README.md`
-only after the corresponding tooling has been selected and initialized.
+Restore and build the backend with `dotnet restore StreamForge.slnx` and
+`dotnet build StreamForge.slnx --no-restore`. Run backend tests with
+`dotnet test StreamForge.slnx --no-build --no-restore`. In `src/web/`, use
+`npm ci`, `npm run build`, and `npm test -- --watch=false`. Start the local
+container topology with `docker compose -f infra/docker/compose.yml up --build`.
+Only document additional commands after their tooling has been initialized and
+verified.
 
 ## Coding Style & Naming Conventions
 
@@ -27,10 +31,11 @@ project naming will be documented when the first applications are generated.
 
 ## Testing Guidelines
 
-Testing frameworks are not selected yet. Reserve `tests/backend/unit/` for unit
-tests, `tests/backend/integration/` for integration tests, `tests/web/e2e/` for
-browser tests, and `tests/performance/` for load testing. Document naming and
-coverage rules when those test projects are initialized.
+Backend tests use xUnit and WebApplicationFactory; Angular unit tests use Vitest.
+Keep unit tests under `tests/backend/unit/`, service-boundary tests under
+`tests/backend/integration/`, browser tests under `tests/web/e2e/`, and load tests
+under `tests/performance/`. Name test projects after the component and test level,
+and name test methods for the behavior and expected outcome.
 
 ## Commit & Pull Request Guidelines
 
