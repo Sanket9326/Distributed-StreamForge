@@ -1,0 +1,6 @@
+@StreamForge.Upload.Api_HostAddress = http://localhost:5081
+
+GET {{StreamForge.Upload.Api_HostAddress}}/health
+Accept: application/json
+
+###

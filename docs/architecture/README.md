@@ -1,8 +1,19 @@
 # Architecture
 
-This is a placeholder service map derived from the project goals. It does not
-select databases, messaging, storage, communication patterns, deployment units,
-or cloud services. Record those decisions in `decisions/` before implementation.
+This service map describes the intended platform boundaries. The Gateway and
+Upload boundaries are implemented by the initial upload slice; the remaining
+boundaries are proposals and must stay empty until explicitly selected.
+
+## Implemented deployment flow
+
+```text
+Web / Nginx -> Gateway / YARP -> Upload -> Upload-owned local volume
+```
+
+The Web application, Gateway, and Upload service are separate build and container
+units. Only the Gateway exposes backend contracts to the browser. Upload owns its
+storage exclusively; other services must use contracts rather than mounting its
+volume.
 
 ## Boundaries
 
