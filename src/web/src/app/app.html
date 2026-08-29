@@ -11,12 +11,69 @@
     <p class="eyebrow">UPLOAD SERVICE · 01</p>
     <h1 id="page-title">Send your source.<br /><em>We’ll take it from here.</em></h1>
     <p class="intro">
-      Add one source video to the upload service. Your original file is stored untouched and ready
-      for future processing workflows.
+      Add the details for one source video. The original is stored untouched, its metadata is
+      recorded, and it is queued for a future processing workflow.
     </p>
   </section>
 
   <section class="workspace" aria-label="Video uploader">
+    <div class="metadata-form" aria-label="Video details">
+      <div class="field-group">
+        <div class="field-heading">
+          <label for="video-title">Title <span>Required</span></label>
+          <span>{{ title().length }}/200</span>
+        </div>
+        <input
+          id="video-title"
+          type="text"
+          maxlength="200"
+          autocomplete="off"
+          placeholder="Give this video a clear title"
+          [value]="title()"
+          [disabled]="state() === 'uploading'"
+          (input)="onTitleInput($event)"
+        />
+      </div>
+
+      <div class="field-group">
+        <div class="field-heading">
+          <label for="video-description">Description <span>Optional</span></label>
+          <span>{{ description().length }}/5000</span>
+        </div>
+        <textarea
+          id="video-description"
+          rows="4"
+          maxlength="5000"
+          placeholder="What should viewers know about this video?"
+          [value]="description()"
+          [disabled]="state() === 'uploading'"
+          (input)="onDescriptionInput($event)"
+        ></textarea>
+      </div>
+
+      <div class="field-group">
+        <div class="field-heading">
+          <label for="video-hashtags">Hashtags <span>Optional</span></label>
+          <span>Up to 10</span>
+        </div>
+        <input
+          id="video-hashtags"
+          type="text"
+          autocomplete="off"
+          placeholder="dotnet, streaming, tutorial"
+          aria-describedby="hashtag-help"
+          [value]="hashtagInput()"
+          [disabled]="state() === 'uploading'"
+          (input)="onHashtagInput($event)"
+        />
+        <small id="hashtag-help">Separate hashtags with commas. A leading # is optional.</small>
+      </div>
+    </div>
+
+    @if (metadataError() && (title() || description() || hashtagInput() || selectedFile())) {
+      <p class="validation-message" role="alert">{{ metadataError() }}</p>
+    }
+
     <div
       class="drop-zone"
       [class.dragging]="isDragging()"
@@ -75,7 +132,12 @@
     </div>
 
     @if (state() === 'ready') {
-      <button class="primary-action" type="button" (click)="startUpload()">
+      <button
+        class="primary-action"
+        type="button"
+        [disabled]="!canUpload()"
+        (click)="startUpload()"
+      >
         Upload video
         <span aria-hidden="true">↗</span>
       </button>
@@ -125,8 +187,8 @@
       <div class="status-panel success" role="status">
         <span class="status-symbol" aria-hidden="true">✓</span>
         <div>
-          <strong>Source stored successfully</strong>
-          <p>The upload service received {{ result.fileName }}.</p>
+          <strong>Video stored and queued</strong>
+          <p>{{ result.title }} is ready for future processing.</p>
         </div>
       </div>
       <dl class="receipt">
@@ -138,6 +200,10 @@
           <dt>Correlation</dt>
           <dd>{{ result.correlationId }}</dd>
         </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{{ result.status }}</dd>
+        </div>
       </dl>
       <button class="secondary-action full" type="button" (click)="reset()">
         Upload another video
@@ -146,7 +212,7 @@
   </section>
 
   <footer>
-    <span>Original files only · No transcoding yet</span>
-    <span>Gateway → Upload Service</span>
+    <span>Original files only · Processing consumer comes later</span>
+    <span>Gateway → Upload → MinIO · PostgreSQL · Kafka</span>
   </footer>
 </main>

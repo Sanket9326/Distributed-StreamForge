@@ -4,11 +4,21 @@ import { Observable } from 'rxjs';
 
 export interface UploadReceipt {
   id: string;
+  title: string;
+  description: string | null;
+  hashtags: string[];
+  status: 'queued';
   fileName: string;
   contentType: string;
   sizeBytes: number;
   uploadedAtUtc: string;
   correlationId: string;
+}
+
+export interface UploadMetadata {
+  title: string;
+  description: string | null;
+  hashtags: string[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,8 +32,15 @@ export class UploadService {
 
   constructor(private readonly http: HttpClient) {}
 
-  upload(file: File): Observable<HttpEvent<UploadReceipt>> {
+  upload(file: File, metadata: UploadMetadata): Observable<HttpEvent<UploadReceipt>> {
     const formData = new FormData();
+    formData.append('title', metadata.title);
+    if (metadata.description) {
+      formData.append('description', metadata.description);
+    }
+    for (const hashtag of metadata.hashtags) {
+      formData.append('hashtags', hashtag);
+    }
     formData.append('file', this.withVideoContentType(file), file.name);
 
     return this.http.post<UploadReceipt>('/api/uploads', formData, {

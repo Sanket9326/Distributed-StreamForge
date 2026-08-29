@@ -4,3 +4,26 @@ GET {{StreamForge.Upload.Api_HostAddress}}/health
 Accept: application/json
 
 ###
+
+POST {{StreamForge.Upload.Api_HostAddress}}/api/uploads
+X-Correlation-ID: local-upload-example
+Content-Type: multipart/form-data; boundary=streamforge-boundary
+
+--streamforge-boundary
+Content-Disposition: form-data; name="title"
+
+Example title
+--streamforge-boundary
+Content-Disposition: form-data; name="description"
+
+Example description
+--streamforge-boundary
+Content-Disposition: form-data; name="hashtags"
+
+dotnet
+--streamforge-boundary
+Content-Disposition: form-data; name="file"; filename="source.mp4"
+Content-Type: video/mp4
+
+< ./source.mp4
+--streamforge-boundary--

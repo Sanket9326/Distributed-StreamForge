@@ -3,9 +3,13 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace StreamForge.Upload.Api.Infrastructure;
 
+/// <summary>
+/// Disables ASP.NET Core form model binding so multipart bodies can be consumed as streams.
+/// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class DisableFormValueModelBindingAttribute : Attribute, IResourceFilter
 {
+    /// <inheritdoc />
     public void OnResourceExecuting(ResourceExecutingContext context)
     {
         var factories = context.ValueProviderFactories;
@@ -14,6 +18,7 @@ public sealed class DisableFormValueModelBindingAttribute : Attribute, IResource
         factories.RemoveType<JQueryFormValueProviderFactory>();
     }
 
+    /// <inheritdoc />
     public void OnResourceExecuted(ResourceExecutedContext context)
     {
     }
