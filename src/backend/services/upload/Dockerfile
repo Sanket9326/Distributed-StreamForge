@@ -10,6 +10,5 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 COPY --from=build /app/publish ./
-RUN mkdir -p /var/lib/streamforge/uploads && chown -R $APP_UID:$APP_UID /var/lib/streamforge
 USER $APP_UID
 ENTRYPOINT ["dotnet", "StreamForge.Upload.Api.dll"]

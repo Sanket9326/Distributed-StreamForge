@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Http;
 
 namespace StreamForge.Upload.Api.Services;
 
+/// <summary>
+/// Validates the filename extension and declared media type of an uploaded source video.
+/// </summary>
 public sealed class VideoFileValidator
 {
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -12,6 +15,10 @@ public sealed class VideoFileValidator
         ".webm"
     };
 
+    /// <summary>Validates a submitted filename and content type.</summary>
+    /// <param name="fileName">The untrusted client filename.</param>
+    /// <param name="contentType">The media type declared for the multipart file section.</param>
+    /// <returns>The validated lowercase file extension.</returns>
     public string Validate(string fileName, string? contentType)
     {
         var safeFileName = Path.GetFileName(fileName);

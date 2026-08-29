@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpEventType } from '@angular/common/http';
 import { Component, ElementRef, OnDestroy, ViewChild, computed, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { UploadReceipt, UploadService } from './upload.service';
+import { UploadMetadata, UploadReceipt, UploadService } from './upload.service';
 
 type UploadState = 'idle' | 'ready' | 'uploading' | 'success' | 'error';
 
@@ -18,6 +18,9 @@ export class App implements OnDestroy {
   @ViewChild('fileInput') private fileInput?: ElementRef<HTMLInputElement>;
 
   protected readonly selectedFile = signal<File | null>(null);
+  protected readonly title = signal('');
+  protected readonly description = signal('');
+  protected readonly hashtagInput = signal('');
   protected readonly state = signal<UploadState>('idle');
   protected readonly progress = signal(0);
   protected readonly receipt = signal<UploadReceipt | null>(null);
@@ -25,6 +28,10 @@ export class App implements OnDestroy {
   protected readonly isDragging = signal(false);
   protected readonly formattedSize = computed(() =>
     this.formatBytes(this.selectedFile()?.size ?? 0),
+  );
+  protected readonly metadataError = computed(() => this.validateMetadata().error);
+  protected readonly canUpload = computed(
+    () => this.state() === 'ready' && this.selectedFile() !== null && !this.metadataError(),
   );
 
   private uploadSubscription?: Subscription;
@@ -38,6 +45,18 @@ export class App implements OnDestroy {
   protected onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.chooseFile(input.files?.item(0) ?? null);
+  }
+
+  protected onTitleInput(event: Event): void {
+    this.title.set((event.target as HTMLInputElement).value);
+  }
+
+  protected onDescriptionInput(event: Event): void {
+    this.description.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected onHashtagInput(event: Event): void {
+    this.hashtagInput.set((event.target as HTMLInputElement).value);
   }
 
   protected onDragOver(event: DragEvent): void {
@@ -63,7 +82,9 @@ export class App implements OnDestroy {
 
   protected startUpload(): void {
     const file = this.selectedFile();
-    if (!file || this.state() === 'uploading') {
+    const metadataValidation = this.validateMetadata();
+    const fileValidationError = file ? this.validateFile(file) : null;
+    if (!file || this.state() === 'uploading' || metadataValidation.error || fileValidationError) {
       return;
     }
 
@@ -72,7 +93,7 @@ export class App implements OnDestroy {
     this.errorMessage.set('');
     this.state.set('uploading');
 
-    this.uploadSubscription = this.uploadService.upload(file).subscribe({
+    this.uploadSubscription = this.uploadService.upload(file, metadataValidation.metadata).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress) {
           const total = event.total ?? file.size;
@@ -110,6 +131,9 @@ export class App implements OnDestroy {
     this.uploadSubscription?.unsubscribe();
     this.uploadSubscription = undefined;
     this.selectedFile.set(null);
+    this.title.set('');
+    this.description.set('');
+    this.hashtagInput.set('');
     this.receipt.set(null);
     this.errorMessage.set('');
     this.progress.set(0);
@@ -162,6 +186,65 @@ export class App implements OnDestroy {
     }
 
     return null;
+  }
+
+  private validateMetadata(): { metadata: UploadMetadata; error: string | null } {
+    const title = this.title().trim();
+    const description = this.description().trim();
+    if (!title) {
+      return {
+        metadata: { title, description: description || null, hashtags: [] },
+        error: 'Add a title before uploading.',
+      };
+    }
+
+    if (title.length > 200) {
+      return {
+        metadata: { title, description: description || null, hashtags: [] },
+        error: 'The title cannot exceed 200 characters.',
+      };
+    }
+
+    if (description.length > 5_000) {
+      return {
+        metadata: { title, description, hashtags: [] },
+        error: 'The description cannot exceed 5,000 characters.',
+      };
+    }
+
+    const hashtags = Array.from(
+      new Set(
+        this.hashtagInput()
+          .split(',')
+          .map((hashtag) => hashtag.trim().replace(/^#/, '').trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    if (hashtags.length > 10) {
+      return {
+        metadata: { title, description: description || null, hashtags },
+        error: 'Add no more than 10 hashtags.',
+      };
+    }
+
+    if (hashtags.some((hashtag) => hashtag.length > 50)) {
+      return {
+        metadata: { title, description: description || null, hashtags },
+        error: 'Each hashtag must be 50 characters or fewer.',
+      };
+    }
+
+    if (hashtags.some((hashtag) => !/^[\p{L}\p{N}_-]+$/u.test(hashtag))) {
+      return {
+        metadata: { title, description: description || null, hashtags },
+        error: 'Hashtags may contain only letters, numbers, underscores, and hyphens.',
+      };
+    }
+
+    return {
+      metadata: { title, description: description || null, hashtags },
+      error: null,
+    };
   }
 
   private describeError(error: HttpErrorResponse): string {

@@ -6,8 +6,13 @@
 - Node.js 24.15.0 or newer and npm 11 for Angular 22.
 - Docker Desktop with Docker Compose for the container workflow.
 
-`global.json`, `package-lock.json`, and the container base images define the
-repeatable toolchain. Never configure upload storage inside the Git workspace.
+`global.json`, `package-lock.json`, NuGet lock resolution, and the container base
+images define the toolchain. Integration tests require Docker because they build
+the pinned MinIO source release and run real PostgreSQL, MinIO, and Kafka containers.
+The first integration run retains the locally built
+`streamforge/minio-test:release-2025-10-15` image so later runs do not recompile
+MinIO. Remove that image explicitly with `docker image rm
+streamforge/minio-test:release-2025-10-15` when it is no longer needed.
 
 ## Restore, build, and test
 
@@ -24,9 +29,11 @@ npm test -- --watch=false
 
 ## Run services locally
 
-Start each command in its own terminal from the repository root. The Upload
-service uses the operating-system temporary directory when no storage root is
-configured.
+Start each command in its own terminal from the repository root. Before starting
+Upload outside Compose, supply `ConnectionStrings__UploadDatabase`,
+`ObjectStorage__Endpoint`, `ObjectStorage__AccessKey`,
+`ObjectStorage__SecretKey`, and `Kafka__BootstrapServers` as environment
+variables. PostgreSQL, MinIO, and Kafka must already be reachable.
 
 ```powershell
 dotnet run --project src/backend/services/upload/StreamForge.Upload.Api.csproj
@@ -48,21 +55,45 @@ service on port 5081.
 ## Run with Docker
 
 ```powershell
+Copy-Item .env.example .env
+# Replace every placeholder in .env before continuing.
 docker compose -f infra/docker/compose.yml up --build
 docker compose -f infra/docker/compose.yml ps
 ```
 
-Open `http://localhost:8080`. Only the Web container publishes a host port. The
-Gateway and Upload service remain on the private Compose network.
+Open the local interfaces:
 
-Stop containers while preserving uploads:
+| Interface | URL | Login |
+| --- | --- | --- |
+| StreamForge | `http://localhost:8080` | None |
+| pgAdmin | `http://localhost:5050` | Email from `STREAMFORGE_PGADMIN_EMAIL`; password from `STREAMFORGE_POSTGRES_PASSWORD` |
+| MinIO Console | `http://localhost:9001` | Access key and secret key from `.env` |
+
+To view Upload metadata in pgAdmin, choose **Add New Server** and use:
+
+| Field | Value |
+| --- | --- |
+| Name | `StreamForge Upload` (or any name) |
+| Host name/address | `postgres` |
+| Port | `5432` |
+| Maintenance database | Value of `STREAMFORGE_POSTGRES_DATABASE` |
+| Username | Value of `STREAMFORGE_POSTGRES_USER` |
+| Password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
+
+Use `postgres`, not `localhost`, because pgAdmin runs inside the Compose network.
+The Gateway, Upload service, database port, MinIO API, and Kafka remain private;
+only the Web UI and local administration consoles publish host ports. Upload
+applies committed EF Core migrations, creates the private MinIO bucket if absent,
+and creates `video-processing` only if absent before becoming ready.
+
+Stop containers while preserving objects, database rows, and Kafka logs:
 
 ```powershell
 docker compose -f infra/docker/compose.yml down
 ```
 
-To permanently delete the local upload volume, explicitly include `--volumes`.
-This cannot be undone:
+To permanently delete all local MinIO, PostgreSQL, Kafka, and pgAdmin data,
+explicitly include `--volumes`. This cannot be undone:
 
 ```powershell
 docker compose -f infra/docker/compose.yml down --volumes
@@ -72,9 +103,23 @@ docker compose -f infra/docker/compose.yml down --volumes
 
 | Component | Key | Default |
 | --- | --- | --- |
+| pgAdmin | `STREAMFORGE_PGADMIN_EMAIL` | `admin@streamforge.dev` |
+| pgAdmin | Login password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
 | Gateway | `ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address` | `http://localhost:5081/` |
-| Upload | `UploadStorage:RootPath` | OS temp directory under `streamforge/uploads` |
-| Upload | `UploadStorage:MaxFileSizeBytes` | `1073741824` |
+| Upload | `ConnectionStrings:UploadDatabase` | Required |
+| Upload | `Upload:MaxFileSizeBytes` | `1073741824` |
+| Upload | `ObjectStorage:Endpoint` | Required |
+| Upload | `ObjectStorage:AccessKey` / `SecretKey` | Required secret values |
+| Upload | `ObjectStorage:Bucket` | `streamforge-videos` |
+| Upload | `ObjectStorage:UseSsl` | `false` |
+| Upload | `Kafka:BootstrapServers` | Required |
+| Upload | `Kafka:TopicName` | `video-processing` |
+| Upload | `Kafka:PartitionCount` / `ReplicationFactor` | `1` / `1` |
+| Upload | `Outbox:PollIntervalMilliseconds` | `1000` |
+| Upload | `Outbox:BatchSize` | `20` |
+| Upload | `Outbox:MaximumRetryDelaySeconds` | `60` |
+| Upload | `Outbox:DegradedAfterSeconds` | `300` |
 
 Use double underscores for environment-variable configuration segments. Do not
-commit secrets, local paths, or uploaded media.
+commit `.env`, secrets, local paths, or uploaded media. `.env.example` contains
+placeholders only.

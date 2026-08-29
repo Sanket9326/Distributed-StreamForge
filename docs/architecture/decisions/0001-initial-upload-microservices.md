@@ -3,6 +3,10 @@
 - Status: Accepted
 - Date: 2026-08-27
 
+The local-volume storage decision is superseded by
+[ADR 0002](0002-async-video-ingestion.md). The deployment, routing, correlation,
+format, and size-limit decisions remain accepted.
+
 ## Context
 
 StreamForge needs its first executable slice without coupling future catalog,
