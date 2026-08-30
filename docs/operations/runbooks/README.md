@@ -49,3 +49,42 @@ Stop containers without data loss using `docker compose -f
 infra/docker/compose.yml down`. To permanently remove all local source objects,
 database rows, and Kafka logs, use `docker compose -f infra/docker/compose.yml
 down --volumes`. Volume deletion cannot be recovered.
+
+## Transcoding is not ready
+
+Inspect the worker and its dependencies:
+
+```powershell
+docker compose -f infra/docker/compose.yml ps
+docker compose -f infra/docker/compose.yml logs transcoding-service postgres minio kafka
+```
+
+Readiness requires the Transcoding schema, `streamforge-renditions`, all four
+Kafka topics, FFmpeg, ffprobe, and the configured minimum scratch capacity. The
+worker verifies but never creates the Upload-owned `video-processing` topic.
+
+## A transcoding job is retrying or failed
+
+Search logs by event, video, or correlation ID. Inspect service-owned state:
+
+```powershell
+docker compose -f infra/docker/compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select event_id, video_id, status, attempt_count, next_attempt_at_utc, lease_owner, lease_expires_at_utc, last_error_code from transcoding.jobs order by created_at_utc;"'
+```
+
+Transient failures retry five times with bounded exponential backoff. A crashed
+replica leaves a lease that another replica can claim after expiration. Invalid
+media fails immediately. Do not edit job or outbox rows manually; restore the
+dependency and use logs plus the failed/dead-letter topic for diagnosis.
+
+## Outcomes are delayed
+
+Successful MinIO objects and terminal job state remain durable while Kafka is
+unavailable. Inspect pending outcome messages:
+
+```powershell
+docker compose -f infra/docker/compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select id, type, topic, attempt_count, next_attempt_at_utc, last_error from transcoding.outbox_messages where processed_at_utc is null order by next_attempt_at_utc;"'
+```
+
+Completion is published only to `video-transcoding-completed`; failure is
+published only to `video-transcoding-failed`. The worker has a code-level guard
+against publishing to `video-processing`.

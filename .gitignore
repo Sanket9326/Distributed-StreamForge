@@ -27,6 +27,8 @@ Thumbs.db
 artifacts/
 data/
 media/
+!src/backend/workers/transcoding/Media/
+!src/backend/workers/transcoding/Media/**
 *.mp4
 *.mkv
 *.mov

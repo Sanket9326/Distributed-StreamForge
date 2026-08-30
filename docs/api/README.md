@@ -85,6 +85,68 @@ canonical video UUID as the Kafka key. The JSON payload uses camel case:
 Delivery is at-least-once. Consumers must persist and deduplicate `eventId`
 before applying non-idempotent work.
 
+`video-processing` is an input-only topic for Transcoding. The Transcoding
+publisher rejects attempts to publish any outcome back to this topic.
+
+## Video transcoding completed event
+
+After every selected rendition is durable and verified, Transcoding publishes
+`VideoTranscodingCompletedV1` to `video-transcoding-completed`, keyed by video
+ID. The payload uses camel case:
+
+```json
+{
+  "eventId": "654c9e39-eece-48a7-a597-f2107bd06f14",
+  "eventType": "video.transcoding.completed",
+  "eventVersion": 1,
+  "occurredAtUtc": "2026-08-30T10:30:00Z",
+  "causationEventId": "5adbaf16-45de-46bc-b499-24be0414125d",
+  "videoId": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
+  "sourceBucket": "streamforge-videos",
+  "sourceObjectKey": "sources/2026/08/30/source.mp4",
+  "sourceEtag": "source-etag",
+  "renditions": [
+    {
+      "tier": "480p",
+      "width": 854,
+      "height": 480,
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "contentType": "video/mp4",
+      "bucket": "streamforge-renditions",
+      "objectKey": "videos/e2c1bb104340452f9fc6a68cf4b12457/480p/e2c1bb104340452f9fc6a68cf4b12457-480p.mp4",
+      "etag": "rendition-etag",
+      "sizeBytes": 5242880
+    }
+  ],
+  "correlationId": "43e738f2cbd446f093d5f64a5b01dc01"
+}
+```
+
+## Video transcoding failed event
+
+A valid job that cannot complete publishes `VideoTranscodingFailedV1` to
+`video-transcoding-failed`, keyed by video ID. `failureReason` is intentionally
+sanitized and never contains credentials or raw process output.
+
+```json
+{
+  "eventId": "09642f4a-ec3c-41b3-8155-982a31f05a82",
+  "eventType": "video.transcoding.failed",
+  "eventVersion": 1,
+  "occurredAtUtc": "2026-08-30T10:31:00Z",
+  "causationEventId": "5adbaf16-45de-46bc-b499-24be0414125d",
+  "videoId": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
+  "failureCode": "source_media_invalid",
+  "failureReason": "The media file could not be probed.",
+  "attemptCount": 1,
+  "correlationId": "43e738f2cbd446f093d5f64a5b01dc01"
+}
+```
+
+Malformed envelopes are published to `video-processing-dead-letter` with their
+source topic, partition, offset, key, rejection code, and original payload.
+
 ## Correlation IDs
 
 Clients may send `X-Correlation-ID` with 1–128 printable ASCII characters. The
@@ -96,6 +158,7 @@ JSON success response and Problem Details body also contain that identifier.
 
 - Gateway: `GET /health`
 - Upload service: `GET /health`, covering PostgreSQL, MinIO, Kafka, and outbox age
+- Transcoding worker: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Web container: `GET /health`
 
 Gateway and Upload health endpoints are internal-only in the Compose topology.

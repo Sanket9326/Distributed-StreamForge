@@ -13,12 +13,20 @@ Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service
                                                     |-> private MinIO object
                                                     |-> PostgreSQL video + outbox
                                                     `-> Kafka video-processing
+                                                               |
+                                                               v
+                                                   .NET Transcoding Worker
+                                                     |-> PostgreSQL jobs + outbox
+                                                     |-> FFmpeg MP4 renditions in MinIO
+                                                     `-> completed / failed Kafka topics
 ```
 
 The Upload service streams MP4, MOV, WebM, and MKV files up to 1 GB directly to
 MinIO, commits metadata and an outbox event to PostgreSQL, and publishes the
-event to Kafka asynchronously. It does not transcode, process, download, or
-serve videos.
+event to Kafka asynchronously. The independently scalable Transcoding worker
+durably accepts those events, generates non-upscaled H.264/AAC MP4 renditions,
+and publishes outcomes to dedicated Kafka topics. Neither service downloads or
+serves video to clients.
 
 ## Quick start with Docker
 

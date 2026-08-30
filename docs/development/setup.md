@@ -5,6 +5,8 @@
 - .NET SDK 10.0.303 or a later 10.0 patch in the same feature band.
 - Node.js 24.15.0 or newer and npm 11 for Angular 22.
 - Docker Desktop with Docker Compose for the container workflow.
+- FFmpeg 8 with `ffprobe` and the `libx264` encoder when running Transcoding
+  directly outside Docker. The worker container already includes these tools.
 
 `global.json`, `package-lock.json`, NuGet lock resolution, and the container base
 images define the toolchain. Integration tests require Docker because they build
@@ -35,8 +37,17 @@ Upload outside Compose, supply `ConnectionStrings__UploadDatabase`,
 `ObjectStorage__SecretKey`, and `Kafka__BootstrapServers` as environment
 variables. PostgreSQL, MinIO, and Kafka must already be reachable.
 
+Before starting Transcoding outside Compose, also supply
+`ConnectionStrings__TranscodingDatabase`, its `ObjectStorage__*` credentials,
+and `Kafka__BootstrapServers`. The `video-processing` input topic must already
+exist; Transcoding creates only its own output topics.
+
 ```powershell
 dotnet run --project src/backend/services/upload/StreamForge.Upload.Api.csproj
+```
+
+```powershell
+dotnet run --project src/backend/workers/transcoding/StreamForge.Transcoding.Worker.csproj
 ```
 
 ```powershell
@@ -81,10 +92,12 @@ To view Upload metadata in pgAdmin, choose **Add New Server** and use:
 | Password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
 
 Use `postgres`, not `localhost`, because pgAdmin runs inside the Compose network.
-The Gateway, Upload service, database port, MinIO API, and Kafka remain private;
+The Gateway, Upload service, Transcoding worker, database port, MinIO API, and Kafka remain private;
 only the Web UI and local administration consoles publish host ports. Upload
 applies committed EF Core migrations, creates the private MinIO bucket if absent,
 and creates `video-processing` only if absent before becoming ready.
+Transcoding then creates `streamforge-renditions` and its completed, failed, and
+dead-letter topics if absent.
 
 Stop containers while preserving objects, database rows, and Kafka logs:
 
@@ -119,6 +132,17 @@ docker compose -f infra/docker/compose.yml down --volumes
 | Upload | `Outbox:BatchSize` | `20` |
 | Upload | `Outbox:MaximumRetryDelaySeconds` | `60` |
 | Upload | `Outbox:DegradedAfterSeconds` | `300` |
+| Transcoding | `ConnectionStrings:TranscodingDatabase` | Required; local Compose uses the Upload database with an isolated schema |
+| Transcoding | `Kafka:ConsumerGroupId` | `streamforge-transcoding-v1` |
+| Transcoding | `Kafka:InputTopic` | `video-processing` |
+| Transcoding | `Kafka:CompletedTopic` | `video-transcoding-completed` |
+| Transcoding | `Kafka:FailedTopic` | `video-transcoding-failed` |
+| Transcoding | `Kafka:DeadLetterTopic` | `video-processing-dead-letter` |
+| Transcoding | `ObjectStorage:RenditionsBucket` | `streamforge-renditions` |
+| Transcoding | `Transcoding:MaxConcurrentJobs` / `MaxAttempts` | `1` / `5` |
+| Transcoding | `Transcoding:LeaseDurationSeconds` / `LeaseHeartbeatSeconds` | `120` / `30` |
+| Transcoding | `Transcoding:JobTimeoutSeconds` | `21600` |
+| Transcoding | `Transcoding:ScratchPath` | `/tmp/streamforge-transcoding` |
 
 Use double underscores for environment-variable configuration segments. Do not
 commit `.env`, secrets, local paths, or uploaded media. `.env.example` contains
