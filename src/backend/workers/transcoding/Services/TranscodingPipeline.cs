@@ -10,6 +10,7 @@ public sealed class TranscodingPipeline(
     IObjectStorage objectStorage,
     IMediaProbe mediaProbe,
     RenditionSelector renditionSelector,
+    GeneratedMediaValidator generatedMediaValidator,
     RenditionKeyFactory keyFactory,
     IVideoEncoder videoEncoder,
     TranscodingTelemetry telemetry,
@@ -61,7 +62,7 @@ public sealed class TranscodingPipeline(
                     source.HasAudio,
                     cancellationToken);
                 var generated = await mediaProbe.ProbeOutputAsync(outputPath, cancellationToken);
-                ValidateGenerated(generated, source, rendition);
+                generatedMediaValidator.Validate(generated, source, rendition);
 
                 var objectKey = keyFactory.Create(job.VideoId, rendition);
                 var metadata = CreateMetadata(job, rendition);
@@ -85,8 +86,8 @@ public sealed class TranscodingPipeline(
 
                 completed.Add(new ProcessedRendition(
                     rendition.Tier,
-                    generated.Width,
-                    generated.Height,
+                    rendition.Width,
+                    rendition.Height,
                     generated.VideoCodec,
                     generated.HasAudio ? generated.AudioCodec : null,
                     "video/mp4",
@@ -128,21 +129,6 @@ public sealed class TranscodingPipeline(
             {
                 logger.LogWarning(exception, "Could not remove transcoding workspace {Workspace}", workspace);
             }
-        }
-    }
-
-    private static void ValidateGenerated(
-        MediaInfo generated,
-        MediaInfo source,
-        RenditionDefinition expected)
-    {
-        if (generated.Width != expected.Width || generated.Height != expected.Height ||
-            !string.Equals(generated.VideoCodec, "h264", StringComparison.OrdinalIgnoreCase) ||
-            (source.HasAudio && !string.Equals(generated.AudioCodec, "aac", StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new PermanentTranscodingException(
-                "generated_media_invalid",
-                $"Generated rendition {expected.Tier} did not match its required media profile.");
         }
     }
 

@@ -81,6 +81,7 @@ builder.Services.AddSingleton<IObjectStorage, MinioObjectStorage>();
 builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
 builder.Services.AddSingleton<IMediaProbe, FfprobeMediaProbe>();
 builder.Services.AddSingleton<RenditionSelector>();
+builder.Services.AddSingleton<GeneratedMediaValidator>();
 builder.Services.AddSingleton<RenditionKeyFactory>();
 builder.Services.AddSingleton<IVideoEncoder, FfmpegVideoEncoder>();
 builder.Services.AddSingleton<ITranscodingPipeline, TranscodingPipeline>();
