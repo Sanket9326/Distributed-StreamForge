@@ -44,6 +44,23 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             }).ExecuteAsync(context);
         });
 
+        downstream.MapGet("/api/feed/videos", async context =>
+        {
+            await Results.Json(new
+            {
+                items = Array.Empty<object>(),
+                nextCursor = (string?)null,
+                correlationId = context.Request.Headers["X-Correlation-ID"].ToString()
+            }).ExecuteAsync(context);
+        });
+
+        downstream.MapGet("/api/feed/videos/{videoId:guid}/completion-events", async context =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            await context.Response.WriteAsync(
+                "event: completed\ndata: {\"videoId\":\"e2c1bb10-4340-452f-9fc6-a68cf4b12457\"}\n\n");
+        });
+
         await downstream.StartAsync();
         downstreamAddress = downstream.Services
             .GetRequiredService<IServer>()
@@ -75,6 +92,8 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address"] =
+                    $"{downstreamAddress}/",
+                ["ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address"] =
                     $"{downstreamAddress}/"
             });
         });

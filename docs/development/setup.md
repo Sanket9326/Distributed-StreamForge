@@ -42,12 +42,21 @@ Before starting Transcoding outside Compose, also supply
 and `Kafka__BootstrapServers`. The `video-processing` input topic must already
 exist; Transcoding creates only its own output topics.
 
+Before starting Feed outside Compose, supply `ConnectionStrings__FeedDatabase`,
+`Kafka__BootstrapServers`, the internal `ObjectStorage__Endpoint`, and a
+browser-visible `ObjectStorage__PublicEndpoint`. Both upload and completion
+topics and the rendition bucket must already exist.
+
 ```powershell
 dotnet run --project src/backend/services/upload/StreamForge.Upload.Api.csproj
 ```
 
 ```powershell
 dotnet run --project src/backend/workers/transcoding/StreamForge.Transcoding.Worker.csproj
+```
+
+```powershell
+dotnet run --project src/backend/services/feed/StreamForge.Feed.Api.csproj
 ```
 
 ```powershell
@@ -60,8 +69,8 @@ npm start
 ```
 
 Open `http://localhost:4200`. The Angular development proxy sends `/api` requests
-to the Gateway on port 5080; the Gateway sends upload requests to the Upload
-service on port 5081.
+to the Gateway on port 5080; the Gateway sends upload requests to Upload on port
+5081 and feed requests to Feed on port 5082.
 
 ## Run with Docker
 
@@ -77,6 +86,7 @@ Open the local interfaces:
 | Interface | URL | Login |
 | --- | --- | --- |
 | StreamForge | `http://localhost:8080` | None |
+| MinIO signed media API | `http://localhost:9000` | Signed playback URLs only |
 | pgAdmin | `http://localhost:5050` | Email from `STREAMFORGE_PGADMIN_EMAIL`; password from `STREAMFORGE_POSTGRES_PASSWORD` |
 | MinIO Console | `http://localhost:9001` | Access key and secret key from `.env` |
 
@@ -92,12 +102,15 @@ To view Upload metadata in pgAdmin, choose **Add New Server** and use:
 | Password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
 
 Use `postgres`, not `localhost`, because pgAdmin runs inside the Compose network.
-The Gateway, Upload service, Transcoding worker, database port, MinIO API, and Kafka remain private;
-only the Web UI and local administration consoles publish host ports. Upload
+The Gateway, Upload service, Transcoding worker, Feed service, database port,
+and Kafka remain private. The Web UI, administration consoles, and MinIO media
+API publish host ports; the rendition bucket remains private and requires signed URLs. Upload
 applies committed EF Core migrations, creates the private MinIO bucket if absent,
 and creates `video-processing` only if absent before becoming ready.
 Transcoding then creates `streamforge-renditions` and its completed, failed, and
-dead-letter topics if absent.
+dead-letter topics if absent. Feed applies its own schema migration, verifies
+those topics and the rendition bucket, and replays retained events from the
+earliest offset for its new consumer group.
 
 Stop containers while preserving objects, database rows, and Kafka logs:
 
@@ -119,6 +132,7 @@ docker compose -f infra/docker/compose.yml down --volumes
 | pgAdmin | `STREAMFORGE_PGADMIN_EMAIL` | `admin@streamforge.dev` |
 | pgAdmin | Login password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
 | Gateway | `ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address` | `http://localhost:5081/` |
+| Gateway | `ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address` | `http://localhost:5082/` |
 | Upload | `ConnectionStrings:UploadDatabase` | Required |
 | Upload | `Upload:MaxFileSizeBytes` | `1073741824` |
 | Upload | `ObjectStorage:Endpoint` | Required |
@@ -143,6 +157,13 @@ docker compose -f infra/docker/compose.yml down --volumes
 | Transcoding | `Transcoding:LeaseDurationSeconds` / `LeaseHeartbeatSeconds` | `120` / `30` |
 | Transcoding | `Transcoding:JobTimeoutSeconds` | `21600` |
 | Transcoding | `Transcoding:ScratchPath` | `/tmp/streamforge-transcoding` |
+| Feed | `ConnectionStrings:FeedDatabase` | Required; local Compose shares PostgreSQL with an isolated `feed` schema |
+| Feed | `Kafka:ConsumerGroupId` | `streamforge-feed-v1` |
+| Feed | `Kafka:UploadedTopic` / `CompletedTopic` | `video-processing` / `video-transcoding-completed` |
+| Feed | `ObjectStorage:Endpoint` | Required internal S3-compatible endpoint |
+| Feed | `ObjectStorage:PublicEndpoint` | Required browser-visible signing endpoint |
+| Feed | `ObjectStorage:RenditionsBucket` | `streamforge-renditions` |
+| Feed | `ObjectStorage:SignedUrlExpirySeconds` | `3600` |
 
 Use double underscores for environment-variable configuration segments. Do not
 commit `.env`, secrets, local paths, or uploaded media. `.env.example` contains

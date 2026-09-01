@@ -23,10 +23,13 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ReverseProxy__Clusters__upload-cluster__Destinations__upload-service__Address: http://upload-service:8080/
+      ReverseProxy__Clusters__feed-cluster__Destinations__feed-service__Address: http://feed-service:8080/
     expose:
       - "8080"
     depends_on:
       upload-service:
+        condition: service_healthy
+      feed-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
@@ -110,6 +113,43 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  feed-service:
+    build:
+      context: ../../src/backend/services/feed
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__FeedDatabase: Host=postgres;Port=5432;Database=${STREAMFORGE_POSTGRES_DATABASE:?Copy .env.example to .env};Username=${STREAMFORGE_POSTGRES_USER:?Copy .env.example to .env};Password=${STREAMFORGE_POSTGRES_PASSWORD:?Copy .env.example to .env}
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__ConsumerGroupId: streamforge-feed-v1
+      Kafka__UploadedTopic: video-processing
+      Kafka__CompletedTopic: video-transcoding-completed
+      ObjectStorage__Endpoint: minio:9000
+      ObjectStorage__PublicEndpoint: localhost:9000
+      ObjectStorage__AccessKey: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
+      ObjectStorage__SecretKey: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
+      ObjectStorage__RenditionsBucket: streamforge-renditions
+      ObjectStorage__UseSsl: "false"
+      ObjectStorage__PublicUseSsl: "false"
+      ObjectStorage__SignedUrlExpirySeconds: "3600"
+    expose:
+      - "8080"
+    depends_on:
+      transcoding-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
   postgres:
     image: postgres:18.6-alpine
     environment:
@@ -156,6 +196,7 @@ services:
     expose:
       - "9000"
     ports:
+      - "9000:9000"
       - "9001:9001"
     volumes:
       - minio-data:/data

@@ -88,3 +88,39 @@ docker compose -f infra/docker/compose.yml exec postgres sh -c 'psql -U "$POSTGR
 Completion is published only to `video-transcoding-completed`; failure is
 published only to `video-transcoding-failed`. The worker has a code-level guard
 against publishing to `video-processing`.
+
+## Feed is empty or not ready
+
+Feed readiness requires PostgreSQL, the private rendition bucket, and both
+`video-processing` and `video-transcoding-completed`. Inspect the service and
+its dependencies:
+
+```powershell
+docker compose -f infra/docker/compose.yml ps
+docker compose -f infra/docker/compose.yml logs feed-service postgres minio kafka
+```
+
+Feed uses `streamforge-feed-v1` with the earliest reset policy. A new database
+projection is rebuilt from events still retained by Kafka. An object that exists
+only in MinIO cannot be listed because descriptive metadata is deliberately not
+stored on rendition objects; restore/replay the matching Kafka events or upload
+the video again instead of reading another service's schema.
+
+Inspect projection state without modifying it:
+
+```powershell
+docker compose -f infra/docker/compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select id, title, has_metadata, has_completion, available_at_utc from feed.videos order by available_at_utc desc nulls last;"'
+```
+
+Rows appear publicly only when metadata, completion, and at least one rendition
+are present. Replayed offsets and event IDs are safe because Feed deduplicates
+them transactionally.
+
+## A signed video does not play
+
+Confirm the browser can reach `http://localhost:9000` and that the Feed response
+contains a non-expired `playbackUrl`. Do not make `streamforge-renditions`
+public. Feed signs URLs using the browser-visible endpoint but verifies storage
+through the private `minio:9000` endpoint. The Web client refreshes an expiring
+URL once; persistent `403` or `404` responses indicate clock skew, mismatched
+credentials/endpoints, or a rendition object removed after its completion event.

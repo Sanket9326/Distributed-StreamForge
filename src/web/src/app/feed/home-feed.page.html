@@ -1,0 +1,50 @@
+<main class="feed-shell">
+  <header class="feed-heading">
+    <div>
+      <p>HOME FEED</p>
+      <h1>Ready to watch</h1>
+    </div>
+    <span>Highest available quality · Progressive MP4</span>
+  </header>
+
+  @if (initialLoading()) {
+    <section class="skeleton" aria-label="Loading videos" aria-busy="true">
+      <div></div>
+      <span></span>
+      <span></span>
+    </section>
+  } @else if (errorMessage() && videos().length === 0) {
+    <section class="feed-state" role="alert">
+      <strong>We couldn’t load the feed</strong>
+      <p>{{ errorMessage() }}</p>
+      <button type="button" (click)="retry()">Try again</button>
+    </section>
+  } @else if (videos().length === 0) {
+    <section class="feed-state empty">
+      <span aria-hidden="true">▶</span>
+      <strong>No videos are ready yet</strong>
+      <p>Completed uploads will appear here automatically.</p>
+    </section>
+  } @else {
+    <section class="video-list" aria-label="Available videos">
+      @for (video of videos(); track video.id) {
+        <app-video-card [video]="video" (playStarted)="onPlayStarted($event)" />
+      }
+    </section>
+
+    @if (errorMessage()) {
+      <section class="inline-error" role="alert">
+        <span>{{ errorMessage() }}</span>
+        <button type="button" (click)="retry()">Retry</button>
+      </section>
+    }
+
+    <div #paginationSentinel class="pagination-sentinel" aria-hidden="true"></div>
+
+    @if (loadingMore()) {
+      <p class="loading-more" role="status">Loading more videos…</p>
+    } @else if (!hasMore()) {
+      <p class="end-of-feed">You’re all caught up.</p>
+    }
+  }
+</main>

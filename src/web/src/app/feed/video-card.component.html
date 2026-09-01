@@ -1,0 +1,68 @@
+<article class="video-card">
+  <div class="player-frame">
+    <video
+      #player
+      controls
+      playsinline
+      preload="metadata"
+      [attr.src]="sourceUrl() || null"
+      [attr.aria-label]="'Play ' + video().title"
+      (play)="onPlay()"
+      (error)="onPlaybackError()"
+    ></video>
+    @if (!sourceUrl() && !playbackError()) {
+      <div class="player-loading" aria-hidden="true">
+        <span>▶</span>
+        <small>{{ refreshing() ? 'Refreshing playback…' : 'Preparing player…' }}</small>
+      </div>
+    }
+    @if (playbackError()) {
+      <p class="player-error" role="alert">{{ playbackError() }}</p>
+    }
+  </div>
+
+  <div class="video-body">
+    <div class="video-copy">
+      <h2>{{ video().title }}</h2>
+      <p class="video-time">
+        {{ relativeUploadTime() }} · {{ video().renditions.length }} qualities
+      </p>
+    </div>
+
+    <div class="video-actions" aria-label="Video actions">
+      <button type="button" [attr.aria-pressed]="liked()" (click)="toggleLike()">
+        <span aria-hidden="true">{{ liked() ? '♥' : '♡' }}</span>
+        {{ liked() ? 'Liked' : 'Like' }}
+      </button>
+      <button type="button" [attr.aria-expanded]="commentsOpen()" (click)="toggleComments()">
+        <span aria-hidden="true">◯</span>
+        Comment
+      </button>
+    </div>
+  </div>
+
+  @if (video().hashtags.length) {
+    <p class="hashtags">
+      @for (hashtag of video().hashtags; track hashtag) {
+        <span>#{{ hashtag }}</span>
+      }
+    </p>
+  }
+
+  @if (video().description) {
+    <div class="description" [class.collapsed]="hasLongDescription() && !descriptionExpanded()">
+      <p>{{ video().description }}</p>
+      @if (hasLongDescription()) {
+        <button type="button" (click)="toggleDescription()">
+          {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (commentsOpen()) {
+    <div class="comments-notice" role="status">
+      Comments are coming in a later iteration. Nothing is saved yet.
+    </div>
+  }
+</article>

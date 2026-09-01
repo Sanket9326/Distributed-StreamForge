@@ -147,6 +147,56 @@ sanitized and never contains credentials or raw process output.
 Malformed envelopes are published to `video-processing-dead-letter` with their
 source topic, partition, offset, key, rejection code, and original payload.
 
+## Home feed
+
+`GET /api/feed/videos?limit={1..10}&cursor={opaque}` returns completed videos in
+newest-available order. `limit` defaults to 10 and cannot exceed 10. Omit
+`cursor` for the first page; pass `nextCursor` unchanged for the next page. A
+null `nextCursor` means there are no older ready videos.
+
+```json
+{
+  "items": [
+    {
+      "id": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
+      "title": "Example title",
+      "description": "Example description",
+      "hashtags": ["dotnet", "video"],
+      "uploadedAtUtc": "2026-08-31T10:30:00Z",
+      "availableAtUtc": "2026-08-31T10:35:00Z",
+      "renditions": [
+        {
+          "tier": "1080p",
+          "width": 1920,
+          "height": 1080,
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "contentType": "video/mp4",
+          "sizeBytes": 5242880,
+          "playbackUrl": "http://localhost:9000/streamforge-renditions/...?signed-query",
+          "playbackUrlExpiresAtUtc": "2026-08-31T11:35:00Z"
+        }
+      ]
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Feed returns every completed rendition but no raw source coordinates. Playback
+URLs expire after one hour and read directly from the private S3-compatible
+bucket. The Web client selects the greatest height and width. If a URL is near
+expiry, `GET /api/feed/videos/{videoId}/renditions` returns a fresh signed set.
+
+`GET /api/feed/videos/{videoId}/completion-events` is a server-sent event stream.
+It emits one `completed` event and closes when that video is complete. If the
+completion was already projected, the event is emitted immediately. The local
+Web client opens this stream only for upload IDs retained in that browser.
+
+Invalid limits and cursors return `400`; a rendition refresh for a video that is
+not ready returns `404`. Other errors follow the repository Problem Details and
+correlation-ID conventions.
+
 ## Correlation IDs
 
 Clients may send `X-Correlation-ID` with 1–128 printable ASCII characters. The
@@ -159,6 +209,7 @@ JSON success response and Problem Details body also contain that identifier.
 - Gateway: `GET /health`
 - Upload service: `GET /health`, covering PostgreSQL, MinIO, Kafka, and outbox age
 - Transcoding worker: `GET /health/live`, `GET /health/ready`, and `GET /health`
+- Feed service: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Web container: `GET /health`
 
 Gateway and Upload health endpoints are internal-only in the Compose topology.
