@@ -56,6 +56,36 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task FeedRoute_ForwardsQueryAndCorrelationId()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/feed/videos?limit=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<FeedDownstreamResponse>();
+        Assert.NotNull(result);
+        Assert.Empty(result.Items);
+        Assert.False(string.IsNullOrWhiteSpace(result.CorrelationId));
+        Assert.Equal(
+            result.CorrelationId,
+            response.Headers.GetValues("X-Correlation-ID").Single());
+    }
+
+    [Fact]
+    public async Task FeedCompletionRoute_PreservesEventStreamResponse()
+    {
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(
+            "/api/feed/videos/e2c1bb10-4340-452f-9fc6-a68cf4b12457/completion-events");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("event: completed", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task UnknownRoute_ReturnsNotFound()
     {
         using var client = factory.CreateClient();
@@ -76,4 +106,6 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     }
 
     private sealed record DownstreamResponse(long ReceivedBytes, string CorrelationId);
+
+    private sealed record FeedDownstreamResponse(object[] Items, string? NextCursor, string CorrelationId);
 }

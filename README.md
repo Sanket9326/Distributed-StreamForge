@@ -5,8 +5,8 @@ microservices and an Angular web client.
 
 ## Implemented slice
 
-The ingestion slice accepts a source video and descriptive metadata through
-three independently deployable components:
+The platform accepts a source video, transcodes progressive MP4 renditions, and
+projects completed videos into a pageable home feed:
 
 ```text
 Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service
@@ -19,14 +19,20 @@ Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service
                                                      |-> PostgreSQL jobs + outbox
                                                      |-> FFmpeg MP4 renditions in MinIO
                                                      `-> completed / failed Kafka topics
+                                                                  |
+                                                                  v
+                                                    .NET Feed API -> PostgreSQL read model
+                                                                  -> signed rendition URLs
 ```
 
 The Upload service streams MP4, MOV, WebM, and MKV files up to 1 GB directly to
 MinIO, commits metadata and an outbox event to PostgreSQL, and publishes the
 event to Kafka asynchronously. The independently scalable Transcoding worker
 durably accepts those events, generates non-upscaled H.264/AAC MP4 renditions,
-and publishes outcomes to dedicated Kafka topics. Neither service downloads or
-serves video to clients.
+and publishes outcomes to dedicated Kafka topics. Feed independently joins the
+upload and completion events, returns only ready videos, and signs every
+available rendition so Angular can stream directly from private object storage.
+No backend service proxies playback bytes.
 
 ## Quick start with Docker
 
@@ -42,6 +48,7 @@ The first build compiles the pinned MinIO Community release from its official
 source tag. The local interfaces are:
 
 - StreamForge: `http://localhost:8080`
+- Signed MinIO media API: `http://localhost:9000` (signed URLs only)
 - pgAdmin: `http://localhost:5050`
 - MinIO Console: `http://localhost:9001`
 

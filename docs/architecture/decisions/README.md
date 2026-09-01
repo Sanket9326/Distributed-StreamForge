@@ -8,6 +8,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0001: Initial upload microservices](0001-initial-upload-microservices.md)
 - [0002: Durable asynchronous video ingestion](0002-async-video-ingestion.md)
 - [0003: Durable video transcoding](0003-durable-video-transcoding.md)
+- [0004: Event-built home feed and signed progressive playback](0004-feed-read-model-and-progressive-playback.md)
 
 ```markdown
 # NNNN: Decision title

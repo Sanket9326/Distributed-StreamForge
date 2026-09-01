@@ -1,218 +1,33 @@
-<main class="shell">
+<div class="app-shell">
   <header class="masthead">
-    <a class="brand" href="/" aria-label="StreamForge home">
-      <span class="brand-mark" aria-hidden="true"> <span></span><span></span><span></span> </span>
+    <a class="brand" routerLink="/" aria-label="StreamForge home">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
       <span>StreamForge</span>
     </a>
-    <span class="environment"><i></i> Local workspace</span>
+
+    <nav aria-label="Primary navigation">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        Home
+      </a>
+      <a routerLink="/upload" routerLinkActive="active">Upload</a>
+    </nav>
+
+    <span class="environment"><i></i> Local</span>
   </header>
 
-  <section class="hero" aria-labelledby="page-title">
-    <p class="eyebrow">UPLOAD SERVICE · 01</p>
-    <h1 id="page-title">Send your source.<br /><em>We’ll take it from here.</em></h1>
-    <p class="intro">
-      Add the details for one source video. The original is stored untouched, its metadata is
-      recorded, and it is queued for a future processing workflow.
-    </p>
-  </section>
+  <router-outlet />
+</div>
 
-  <section class="workspace" aria-label="Video uploader">
-    <div class="metadata-form" aria-label="Video details">
-      <div class="field-group">
-        <div class="field-heading">
-          <label for="video-title">Title <span>Required</span></label>
-          <span>{{ title().length }}/200</span>
-        </div>
-        <input
-          id="video-title"
-          type="text"
-          maxlength="200"
-          autocomplete="off"
-          placeholder="Give this video a clear title"
-          [value]="title()"
-          [disabled]="state() === 'uploading'"
-          (input)="onTitleInput($event)"
-        />
-      </div>
-
-      <div class="field-group">
-        <div class="field-heading">
-          <label for="video-description">Description <span>Optional</span></label>
-          <span>{{ description().length }}/5000</span>
-        </div>
-        <textarea
-          id="video-description"
-          rows="4"
-          maxlength="5000"
-          placeholder="What should viewers know about this video?"
-          [value]="description()"
-          [disabled]="state() === 'uploading'"
-          (input)="onDescriptionInput($event)"
-        ></textarea>
-      </div>
-
-      <div class="field-group">
-        <div class="field-heading">
-          <label for="video-hashtags">Hashtags <span>Optional</span></label>
-          <span>Up to 10</span>
-        </div>
-        <input
-          id="video-hashtags"
-          type="text"
-          autocomplete="off"
-          placeholder="dotnet, streaming, tutorial"
-          aria-describedby="hashtag-help"
-          [value]="hashtagInput()"
-          [disabled]="state() === 'uploading'"
-          (input)="onHashtagInput($event)"
-        />
-        <small id="hashtag-help">Separate hashtags with commas. A leading # is optional.</small>
-      </div>
+@if (completions.toast(); as toast) {
+  <aside class="completion-toast" role="status" aria-live="polite">
+    <span class="toast-icon" aria-hidden="true">✓</span>
+    <div>
+      <strong>Your video is ready</strong>
+      <p>{{ toast.title }} finished processing.</p>
+      <a routerLink="/" (click)="completions.dismissToast()">View Home</a>
     </div>
-
-    @if (metadataError() && (title() || description() || hashtagInput() || selectedFile())) {
-      <p class="validation-message" role="alert">{{ metadataError() }}</p>
-    }
-
-    <div
-      class="drop-zone"
-      [class.dragging]="isDragging()"
-      [class.has-file]="selectedFile()"
-      [class.locked]="state() === 'uploading'"
-      (dragover)="onDragOver($event)"
-      (dragleave)="onDragLeave($event)"
-      (drop)="onDrop($event)"
-    >
-      <input
-        #fileInput
-        id="video-file"
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mkv"
-        [disabled]="state() === 'uploading'"
-        (change)="onFileSelected($event)"
-      />
-
-      @if (!selectedFile()) {
-        <label for="video-file" class="drop-label">
-          <span class="upload-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" role="img">
-              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15.5V19h14v-3.5" />
-            </svg>
-          </span>
-          <strong>Drop a video here</strong>
-          <span>or <u>browse your files</u></span>
-        </label>
-      } @else {
-        <div class="file-card">
-          <span class="file-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M10 13l5 3-5 3z" /></svg>
-          </span>
-          <div class="file-copy">
-            <strong>{{ selectedFile()?.name }}</strong>
-            <span>{{ formattedSize() }} · Source video</span>
-          </div>
-          @if (state() !== 'uploading') {
-            <button
-              class="icon-button"
-              type="button"
-              aria-label="Remove selected file"
-              (click)="reset()"
-            >
-              ×
-            </button>
-          }
-        </div>
-      }
-    </div>
-
-    <div class="rules" aria-label="Upload requirements">
-      <span>MP4 · MOV · WEBM · MKV</span>
-      <span>MAXIMUM 1 GB</span>
-      <span>ONE FILE AT A TIME</span>
-    </div>
-
-    @if (state() === 'ready') {
-      <button
-        class="primary-action"
-        type="button"
-        [disabled]="!canUpload()"
-        (click)="startUpload()"
-      >
-        Upload video
-        <span aria-hidden="true">↗</span>
-      </button>
-    }
-
-    @if (state() === 'uploading') {
-      <div class="progress-panel" aria-live="polite">
-        <div class="progress-heading">
-          <span>Uploading source</span>
-          <strong>{{ progress() }}%</strong>
-        </div>
-        <div
-          class="progress-track"
-          role="progressbar"
-          aria-label="Upload progress"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          [attr.aria-valuenow]="progress()"
-        >
-          <span [style.width.%]="progress()"></span>
-        </div>
-        <button class="text-action" type="button" (click)="cancelUpload()">Cancel upload</button>
-      </div>
-    }
-
-    @if (state() === 'error') {
-      <div class="status-panel error" role="alert">
-        <span class="status-symbol" aria-hidden="true">!</span>
-        <div>
-          <strong>Upload not completed</strong>
-          <p>{{ errorMessage() }}</p>
-        </div>
-      </div>
-      <div class="action-row">
-        @if (selectedFile()) {
-          <button class="primary-action compact" type="button" (click)="retryUpload()">
-            Try again
-          </button>
-        }
-        <button class="secondary-action" type="button" (click)="reset()">
-          Choose another file
-        </button>
-      </div>
-    }
-
-    @if (receipt(); as result) {
-      <div class="status-panel success" role="status">
-        <span class="status-symbol" aria-hidden="true">✓</span>
-        <div>
-          <strong>Video stored and queued</strong>
-          <p>{{ result.title }} is ready for future processing.</p>
-        </div>
-      </div>
-      <dl class="receipt">
-        <div>
-          <dt>Upload ID</dt>
-          <dd>{{ result.id }}</dd>
-        </div>
-        <div>
-          <dt>Correlation</dt>
-          <dd>{{ result.correlationId }}</dd>
-        </div>
-        <div>
-          <dt>Status</dt>
-          <dd>{{ result.status }}</dd>
-        </div>
-      </dl>
-      <button class="secondary-action full" type="button" (click)="reset()">
-        Upload another video
-      </button>
-    }
-  </section>
-
-  <footer>
-    <span>Original files only · Processing consumer comes later</span>
-    <span>Gateway → Upload → MinIO · PostgreSQL · Kafka</span>
-  </footer>
-</main>
+    <button type="button" aria-label="Dismiss notification" (click)="completions.dismissToast()">
+      ×
+    </button>
+  </aside>
+}

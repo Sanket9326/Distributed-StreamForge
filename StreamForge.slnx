@@ -1,13 +1,16 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/backend/gateway/StreamForge.Gateway.Api.csproj" />
+    <Project Path="src/backend/services/feed/StreamForge.Feed.Api.csproj" />
     <Project Path="src/backend/services/upload/StreamForge.Upload.Api.csproj" />
     <Project Path="src/backend/workers/transcoding/StreamForge.Transcoding.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/backend/integration/StreamForge.Feed.IntegrationTests/StreamForge.Feed.IntegrationTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Gateway.IntegrationTests/StreamForge.Gateway.IntegrationTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Transcoding.IntegrationTests/StreamForge.Transcoding.IntegrationTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Upload.IntegrationTests/StreamForge.Upload.IntegrationTests.csproj" />
+    <Project Path="tests/backend/unit/StreamForge.Feed.UnitTests/StreamForge.Feed.UnitTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Upload.UnitTests/StreamForge.Upload.UnitTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Transcoding.UnitTests/StreamForge.Transcoding.UnitTests.csproj" />
   </Folder>

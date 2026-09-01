@@ -1,0 +1,175 @@
+<main class="upload-shell">
+  <header class="page-heading">
+    <p>UPLOAD</p>
+    <h1>Share a video</h1>
+    <span>Add the video and the details viewers should see.</span>
+  </header>
+
+  <section class="workspace" aria-label="Video uploader">
+    <div class="metadata-form" aria-label="Video details">
+      <div class="field-group">
+        <div class="field-heading">
+          <label for="video-title">Title <span>Required</span></label>
+          <span>{{ title().length }}/200</span>
+        </div>
+        <input
+          id="video-title"
+          type="text"
+          maxlength="200"
+          autocomplete="off"
+          placeholder="Give this video a clear title"
+          [value]="title()"
+          [disabled]="state() === 'uploading'"
+          (input)="onTitleInput($event)"
+        />
+      </div>
+
+      <div class="field-group description-field">
+        <div class="field-heading">
+          <label for="video-description">Description <span>Optional</span></label>
+          <span>{{ description().length }}/5000</span>
+        </div>
+        <textarea
+          id="video-description"
+          rows="5"
+          maxlength="5000"
+          placeholder="What should viewers know about this video?"
+          [value]="description()"
+          [disabled]="state() === 'uploading'"
+          (input)="onDescriptionInput($event)"
+        ></textarea>
+      </div>
+
+      <div class="field-group">
+        <div class="field-heading">
+          <label for="video-hashtags">Hashtags <span>Optional</span></label>
+          <span>Up to 10</span>
+        </div>
+        <input
+          id="video-hashtags"
+          type="text"
+          autocomplete="off"
+          placeholder="dotnet, streaming, tutorial"
+          aria-describedby="hashtag-help"
+          [value]="hashtagInput()"
+          [disabled]="state() === 'uploading'"
+          (input)="onHashtagInput($event)"
+        />
+        <small id="hashtag-help">Separate hashtags with commas.</small>
+      </div>
+    </div>
+
+    @if (metadataError() && (title() || description() || hashtagInput() || selectedFile())) {
+      <p class="validation-message" role="alert">{{ metadataError() }}</p>
+    }
+
+    <div
+      class="drop-zone"
+      [class.dragging]="isDragging()"
+      [class.has-file]="selectedFile()"
+      [class.locked]="state() === 'uploading'"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+    >
+      <input
+        #fileInput
+        id="video-file"
+        type="file"
+        accept="video/mp4,video/quicktime,video/webm,video/x-matroska,.mkv"
+        [disabled]="state() === 'uploading'"
+        (change)="onFileSelected($event)"
+      />
+
+      @if (!selectedFile()) {
+        <label for="video-file" class="drop-label">
+          <span class="upload-icon" aria-hidden="true">↑</span>
+          <strong>Drop a video here</strong>
+          <span>or <u>browse your files</u></span>
+        </label>
+      } @else {
+        <div class="file-card">
+          <span class="file-icon" aria-hidden="true">▶</span>
+          <div class="file-copy">
+            <strong>{{ selectedFile()?.name }}</strong>
+            <span>{{ formattedSize() }} · Source video</span>
+          </div>
+          @if (state() !== 'uploading') {
+            <button
+              class="icon-button"
+              type="button"
+              aria-label="Remove selected file"
+              (click)="reset()"
+            >
+              ×
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="rules" aria-label="Upload requirements">
+      <span>MP4 · MOV · WEBM · MKV</span><span>MAXIMUM 1 GB</span><span>ONE FILE</span>
+    </div>
+
+    @if (state() === 'ready') {
+      <button
+        class="primary-action"
+        type="button"
+        [disabled]="!canUpload()"
+        (click)="startUpload()"
+      >
+        Upload video <span aria-hidden="true">↗</span>
+      </button>
+    }
+    @if (state() === 'uploading') {
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-heading">
+          <span>Uploading source</span><strong>{{ progress() }}%</strong>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          aria-label="Upload progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-valuenow]="progress()"
+        >
+          <span [style.width.%]="progress()"></span>
+        </div>
+        <button class="text-action" type="button" (click)="cancelUpload()">Cancel upload</button>
+      </div>
+    }
+    @if (state() === 'error') {
+      <div class="status-panel error" role="alert">
+        <span class="status-symbol">!</span>
+        <div>
+          <strong>Upload not completed</strong>
+          <p>{{ errorMessage() }}</p>
+        </div>
+      </div>
+      <div class="action-row">
+        @if (selectedFile()) {
+          <button class="primary-action compact" type="button" (click)="retryUpload()">
+            Try again
+          </button>
+        }
+        <button class="secondary-action" type="button" (click)="reset()">
+          Choose another file
+        </button>
+      </div>
+    }
+    @if (receipt(); as result) {
+      <div class="status-panel success" role="status">
+        <span class="status-symbol">✓</span>
+        <div>
+          <strong>Video stored and queued</strong>
+          <p>We’ll notify you when {{ result.title }} is ready.</p>
+        </div>
+      </div>
+      <button class="secondary-action full" type="button" (click)="reset()">
+        Upload another video
+      </button>
+    }
+  </section>
+</main>
