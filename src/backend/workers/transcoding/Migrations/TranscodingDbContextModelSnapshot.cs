@@ -55,6 +55,153 @@ namespace StreamForge.Transcoding.Worker.Migrations
                     b.ToTable("consumed_messages", "transcoding");
                 });
 
+            modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.HlsPackageAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AssetPrefix")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("asset_prefix");
+
+                    b.Property<string>("Bucket")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("bucket");
+
+                    b.Property<double>("DurationSeconds")
+                        .HasColumnType("double precision")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<Guid>("JobEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_event_id");
+
+                    b.Property<string>("MasterPlaylistEtag")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("master_playlist_etag");
+
+                    b.Property<string>("MasterPlaylistObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("master_playlist_object_key");
+
+                    b.Property<string>("SegmentFormat")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("segment_format");
+
+                    b.Property<int>("TargetSegmentDurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_segment_duration_seconds");
+
+                    b.Property<long>("TotalSizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total_size_bytes");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hls_packages");
+
+                    b.HasIndex("JobEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hls_packages_job_event_id");
+
+                    b.ToTable("hls_packages", "transcoding");
+                });
+
+            modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.HlsVariantAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AudioCodec")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("audio_codec");
+
+                    b.Property<long>("AverageBandwidthBitsPerSecond")
+                        .HasColumnType("bigint")
+                        .HasColumnName("average_bandwidth_bits_per_second");
+
+                    b.Property<long>("BandwidthBitsPerSecond")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bandwidth_bits_per_second");
+
+                    b.Property<string>("Codecs")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("codecs");
+
+                    b.Property<double>("FrameRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("frame_rate");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<Guid>("JobEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("job_event_id");
+
+                    b.Property<string>("PlaylistEtag")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("playlist_etag");
+
+                    b.Property<string>("PlaylistObjectKey")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("playlist_object_key");
+
+                    b.Property<int>("SegmentCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("segment_count");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<string>("Tier")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("tier");
+
+                    b.Property<string>("VideoCodec")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("video_codec");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hls_variants");
+
+                    b.HasIndex("JobEventId", "Tier")
+                        .IsUnique()
+                        .HasDatabaseName("ux_hls_variants_job_tier");
+
+                    b.ToTable("hls_variants", "transcoding");
+                });
+
             modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.OutboxMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -310,6 +457,29 @@ namespace StreamForge.Transcoding.Worker.Migrations
                     b.ToTable("jobs", "transcoding");
                 });
 
+            modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.HlsPackageAsset", b =>
+                {
+                    b.HasOne("StreamForge.Transcoding.Worker.Data.Entities.TranscodingJob", "Job")
+                        .WithOne("HlsPackage")
+                        .HasForeignKey("StreamForge.Transcoding.Worker.Data.Entities.HlsPackageAsset", "JobEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Job");
+                });
+
+            modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.HlsVariantAsset", b =>
+                {
+                    b.HasOne("StreamForge.Transcoding.Worker.Data.Entities.HlsPackageAsset", "Package")
+                        .WithMany("Variants")
+                        .HasForeignKey("JobEventId")
+                        .HasPrincipalKey("JobEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+                });
+
             modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.RenditionAsset", b =>
                 {
                     b.HasOne("StreamForge.Transcoding.Worker.Data.Entities.TranscodingJob", "Job")
@@ -322,8 +492,15 @@ namespace StreamForge.Transcoding.Worker.Migrations
                     b.Navigation("Job");
                 });
 
+            modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.HlsPackageAsset", b =>
+                {
+                    b.Navigation("Variants");
+                });
+
             modelBuilder.Entity("StreamForge.Transcoding.Worker.Data.Entities.TranscodingJob", b =>
                 {
+                    b.Navigation("HlsPackage");
+
                     b.Navigation("Renditions");
                 });
 #pragma warning restore 612, 618

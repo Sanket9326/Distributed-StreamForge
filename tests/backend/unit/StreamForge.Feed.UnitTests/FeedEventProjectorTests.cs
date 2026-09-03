@@ -79,6 +79,19 @@ public sealed class FeedEventProjectorTests
             (await dbContext.ConsumedMessages.SingleAsync()).RejectionCode);
     }
 
+    [Fact]
+    public async Task ProjectAsync_V2MarksHlsAvailableAndPreservesProgressiveRenditions()
+    {
+        var factory = CreateFactory();
+        var projector = new FeedEventProjector(factory, Options.Create(new KafkaOptions()), Options.Create(new ObjectStorageOptions()), TimeProvider.System, NullLogger<FeedEventProjector>.Instance);
+        var videoId = Guid.NewGuid(); var v1 = Completed(videoId); var prefix = $"videos/{videoId:N}/hls/";
+        var completed = new VideoTranscodingCompletedV2(v1.EventId,v1.EventType,2,v1.OccurredAtUtc,v1.CausationEventId,videoId,v1.SourceBucket,v1.SourceObjectKey,v1.SourceEtag,v1.Renditions,
+            new HlsPackageV2("streamforge-renditions",prefix,prefix+"master.m3u8","etag","fmp4",4,10,100,[new HlsVariantV2("480p",854,480,30,"h264","aac","avc1.4d401f,mp4a.40.2",1_500_000,1_200_000,prefix+"480p/index.m3u8","etag",3,100)]),"correlation");
+        await projector.ProjectAsync(Envelope("video-transcoding-completed",0,completed),CancellationToken.None);
+        await using var db=await factory.CreateDbContextAsync();var video=await db.Videos.Include(x=>x.Renditions).SingleAsync();
+        Assert.True(video.HasHls);Assert.Equal(2,video.Renditions.Count);
+    }
+
     private static ConsumedEnvelope Envelope(string topic, long offset, object payload) => new(
         topic,
         0,

@@ -18,7 +18,10 @@ describe('VideoCardComponent', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
 
   it('selects the highest rendition and keeps social actions local', () => {
     fixture.componentRef.setInput('video', video());
@@ -56,6 +59,35 @@ describe('VideoCardComponent', () => {
     expect(fixture.nativeElement.querySelector('video').getAttribute('src')).toBe(
       'https://storage.test/refreshed.mp4',
     );
+  });
+
+  it('starts playback automatically when opened from the feed', async () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    fixture.componentRef.setInput('video', video());
+    fixture.componentRef.setInput('autoplay', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(play).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to muted playback when the browser blocks audible autoplay', async () => {
+    const play = vi
+      .spyOn(HTMLMediaElement.prototype, 'play')
+      .mockRejectedValueOnce(new DOMException('Autoplay blocked', 'NotAllowedError'))
+      .mockResolvedValueOnce(undefined);
+    fixture.componentRef.setInput('video', video());
+    fixture.componentRef.setInput('autoplay', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const player = fixture.nativeElement.querySelector('video') as HTMLVideoElement;
+    await vi.waitFor(() => expect(play).toHaveBeenCalledTimes(2));
+    expect(player.muted).toBe(true);
+
+    player.dispatchEvent(new Event('playing'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Tap for sound');
   });
 
   function findButton(label: string): HTMLButtonElement {

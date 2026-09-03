@@ -96,6 +96,15 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task PlaybackRoute_PreservesManifestContentType()
+    {
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/playback/videos/e2c1bb10-4340-452f-9fc6-a68cf4b12457/master.m3u8");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/vnd.apple.mpegurl", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Health_ReturnsOk()
     {
         using var client = factory.CreateClient();

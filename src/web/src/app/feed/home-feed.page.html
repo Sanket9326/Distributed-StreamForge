@@ -1,50 +1,109 @@
-<main class="feed-shell">
-  <header class="feed-heading">
-    <div>
-      <p>HOME FEED</p>
-      <h1>Ready to watch</h1>
-    </div>
-    <span>Highest available quality · Progressive MP4</span>
-  </header>
+@if (selectedVideo(); as selected) {
+  <main class="watch-shell">
+    <button class="back-button" type="button" (click)="closeWatch()">
+      <span aria-hidden="true">←</span>
+      Back to Home
+    </button>
 
-  @if (initialLoading()) {
-    <section class="skeleton" aria-label="Loading videos" aria-busy="true">
-      <div></div>
-      <span></span>
-      <span></span>
-    </section>
-  } @else if (errorMessage() && videos().length === 0) {
-    <section class="feed-state" role="alert">
-      <strong>We couldn’t load the feed</strong>
-      <p>{{ errorMessage() }}</p>
-      <button type="button" (click)="retry()">Try again</button>
-    </section>
-  } @else if (videos().length === 0) {
-    <section class="feed-state empty">
-      <span aria-hidden="true">▶</span>
-      <strong>No videos are ready yet</strong>
-      <p>Completed uploads will appear here automatically.</p>
-    </section>
-  } @else {
-    <section class="video-list" aria-label="Available videos">
-      @for (video of videos(); track video.id) {
-        <app-video-card [video]="video" (playStarted)="onPlayStarted($event)" />
-      }
-    </section>
-
-    @if (errorMessage()) {
-      <section class="inline-error" role="alert">
-        <span>{{ errorMessage() }}</span>
-        <button type="button" (click)="retry()">Retry</button>
+    <div class="watch-layout">
+      <section class="watch-primary" aria-label="Now playing">
+        <app-video-card
+          [video]="selected"
+          appearance="watch"
+          [autoplay]="true"
+          (playStarted)="onPlayStarted($event)"
+        />
       </section>
-    }
 
-    <div #paginationSentinel class="pagination-sentinel" aria-hidden="true"></div>
+      <aside class="watch-rail" aria-label="Up next">
+        <div class="rail-heading">
+          <h2>Up next</h2>
+          <span>Autoplay</span>
+        </div>
+        <div class="rail-chips" aria-label="Recommendation filters">
+          <button class="active" type="button">All</button>
+          <button type="button">Related</button>
+          <button type="button">From StreamForge</button>
+        </div>
 
-    @if (loadingMore()) {
-      <p class="loading-more" role="status">Loading more videos…</p>
-    } @else if (!hasMore()) {
-      <p class="end-of-feed">You’re all caught up.</p>
+        @if (recommendations().length) {
+          <div class="recommendation-list">
+            @for (video of recommendations(); track video.id) {
+              <app-video-card
+                [video]="video"
+                appearance="recommendation"
+                (watchRequested)="openWatch($event)"
+              />
+            }
+          </div>
+        } @else {
+          <div class="recommendation-empty">
+            <span aria-hidden="true">▶</span>
+            <p>More recommendations will appear as videos finish processing.</p>
+          </div>
+        }
+      </aside>
+    </div>
+  </main>
+} @else {
+  <main class="feed-shell">
+    <div class="category-strip" aria-label="Video categories">
+      @for (category of categories; track category; let first = $first) {
+        <button [class.active]="first" type="button">{{ category }}</button>
+      }
+    </div>
+
+    <header class="feed-heading">
+      <div>
+        <p>STREAMFORGE HOME</p>
+        <h1>Recommended</h1>
+      </div>
+      <span>Adaptive playback on every screen</span>
+    </header>
+
+    @if (initialLoading()) {
+      <section class="skeleton-grid" aria-label="Loading videos" aria-busy="true">
+        @for (item of [1, 2, 3, 4, 5, 6]; track item) {
+          <div class="skeleton">
+            <div></div>
+            <span></span>
+            <span></span>
+          </div>
+        }
+      </section>
+    } @else if (errorMessage() && videos().length === 0) {
+      <section class="feed-state" role="alert">
+        <strong>We couldn’t load the feed</strong>
+        <p>{{ errorMessage() }}</p>
+        <button type="button" (click)="retry()">Try again</button>
+      </section>
+    } @else if (videos().length === 0) {
+      <section class="feed-state empty">
+        <span aria-hidden="true">▶</span>
+        <strong>No videos are ready yet</strong>
+        <p>Completed uploads will appear here automatically.</p>
+      </section>
+    } @else {
+      <section class="video-list" aria-label="Available videos">
+        @for (video of videos(); track video.id) {
+          <app-video-card [video]="video" appearance="grid" (watchRequested)="openWatch($event)" />
+        }
+      </section>
+
+      @if (errorMessage()) {
+        <section class="inline-error" role="alert">
+          <span>{{ errorMessage() }}</span>
+          <button type="button" (click)="retry()">Retry</button>
+        </section>
+      }
+
+      <div #paginationSentinel class="pagination-sentinel" aria-hidden="true"></div>
+
+      @if (loadingMore()) {
+        <p class="loading-more" role="status">Loading more videos…</p>
+      } @else if (!hasMore()) {
+        <p class="end-of-feed">You’re all caught up.</p>
+      }
     }
-  }
-</main>
+  </main>
+}

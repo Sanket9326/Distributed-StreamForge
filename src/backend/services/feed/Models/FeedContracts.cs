@@ -11,6 +11,7 @@ public sealed record FeedVideoResponse(
     IReadOnlyList<string> Hashtags,
     DateTimeOffset UploadedAtUtc,
     DateTimeOffset AvailableAtUtc,
+    string? HlsManifestUrl,
     IReadOnlyList<FeedRenditionResponse> Renditions);
 
 public sealed record FeedRenditionResponse(

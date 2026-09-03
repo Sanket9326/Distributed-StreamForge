@@ -42,27 +42,29 @@ public sealed class FfmpegVideoEncoder(
         var arguments = new List<string>
         {
             "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-i", inputPath,
-            "-map", "0:v:0"
+            "-i", inputPath
         };
-        if (hasAudio)
+        if (!hasAudio)
         {
-            arguments.AddRange(["-map", "0:a:0?", "-c:a", "aac", "-b:a", rendition.AudioRate]);
+            arguments.AddRange(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"]);
         }
-        else
-        {
-            arguments.Add("-an");
-        }
+        arguments.AddRange(["-map", "0:v:0", "-map", hasAudio ? "0:a:0?" : "1:a:0", "-c:a", "aac", "-profile:a", "aac_low", "-b:a", rendition.AudioRate]);
+        if (!hasAudio) arguments.Add("-shortest");
 
         arguments.AddRange(
         [
-            "-vf", $"scale={rendition.Width}:{rendition.Height}:flags=lanczos",
+            "-vf", $"scale={rendition.Width}:{rendition.Height}:flags=lanczos,fps={rendition.FrameRate.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}",
             "-c:v", "libx264",
+            "-profile:v", "main",
             "-preset", "medium",
             "-crf", rendition.Crf.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "-maxrate", rendition.MaximumVideoRate,
             "-bufsize", rendition.VideoBufferSize,
             "-pix_fmt", "yuv420p",
+            "-flags", "+cgop",
+            "-g", Math.Max(1, (int)Math.Round(rendition.FrameRate * 4)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "-keyint_min", Math.Max(1, (int)Math.Round(rendition.FrameRate * 4)).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "-sc_threshold", "0",
             "-movflags", "+faststart",
             "-map_metadata", "-1",
             "-sn", "-dn",

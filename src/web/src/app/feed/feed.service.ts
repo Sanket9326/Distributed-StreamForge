@@ -21,6 +21,7 @@ export interface FeedVideo {
   hashtags: string[];
   uploadedAtUtc: string;
   availableAtUtc: string;
+  hlsManifestUrl?: string | null;
   renditions: FeedRendition[];
 }
 

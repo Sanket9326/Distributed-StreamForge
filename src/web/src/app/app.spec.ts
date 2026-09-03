@@ -9,7 +9,7 @@ import { routes } from './app.routes';
 describe('App shell', () => {
   beforeEach(() => localStorage.clear());
 
-  it('renders Home and Upload navigation with Home as the default route', async () => {
+  it('renders the primary navigation with Home as the default route', async () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes)],
@@ -23,15 +23,19 @@ describe('App shell', () => {
     fixture.detectChanges();
 
     const request = http.expectOne(
-      (candidate) => candidate.url === '/api/feed/videos' && candidate.params.get('limit') === '1',
+      (candidate) => candidate.url === '/api/feed/videos' && candidate.params.get('limit') === '10',
     );
     request.flush({ items: [], nextCursor: null });
     fixture.detectChanges();
 
     const links = Array.from(
-      fixture.nativeElement.querySelectorAll('nav a'),
+      fixture.nativeElement.querySelectorAll('.sidebar nav a'),
     ) as HTMLAnchorElement[];
-    expect(links.map((link) => link.textContent?.trim())).toEqual(['Home', 'Upload']);
+    expect(links.map((link) => link.getAttribute('aria-label'))).toEqual([
+      'Home',
+      'Explore',
+      'Upload',
+    ]);
     expect(fixture.nativeElement.textContent).toContain('No videos are ready yet');
     http.verify();
   });

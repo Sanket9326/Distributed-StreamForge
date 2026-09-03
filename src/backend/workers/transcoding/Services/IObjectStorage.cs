@@ -17,6 +17,13 @@ public interface IObjectStorage
         IReadOnlyDictionary<string, string> metadata,
         CancellationToken cancellationToken);
 
+    Task<StoredObjectInfo> UploadAssetAsync(
+        string objectKey,
+        string filePath,
+        string contentType,
+        IReadOnlyDictionary<string, string> metadata,
+        CancellationToken cancellationToken);
+
     Task DeleteRenditionAsync(string objectKey, CancellationToken cancellationToken);
 
     Task VerifyAvailableAsync(CancellationToken cancellationToken);

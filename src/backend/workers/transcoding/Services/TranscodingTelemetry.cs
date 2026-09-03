@@ -17,6 +17,11 @@ public sealed class TranscodingTelemetry : IDisposable
         EncodeDuration = meter.CreateHistogram<double>("transcoding.jobs.duration", "s");
         QueueAge = meter.CreateHistogram<double>("transcoding.jobs.queue_age", "s");
         RenditionSize = meter.CreateHistogram<long>("transcoding.renditions.size", "By");
+        PackagingDuration = meter.CreateHistogram<double>("transcoding.hls.packaging.duration", "s");
+        SegmentCount = meter.CreateHistogram<int>("transcoding.hls.segment.count");
+        PackagedBytes = meter.CreateHistogram<long>("transcoding.hls.packaged.bytes", "By");
+        UploadFailures = meter.CreateCounter<long>("transcoding.hls.upload.failures");
+        ValidationFailures = meter.CreateCounter<long>("transcoding.hls.validation.failures");
     }
 
     public Counter<long> AcceptedJobs { get; }
@@ -34,6 +39,11 @@ public sealed class TranscodingTelemetry : IDisposable
     public Histogram<double> QueueAge { get; }
 
     public Histogram<long> RenditionSize { get; }
+    public Histogram<double> PackagingDuration { get; }
+    public Histogram<int> SegmentCount { get; }
+    public Histogram<long> PackagedBytes { get; }
+    public Counter<long> UploadFailures { get; }
+    public Counter<long> ValidationFailures { get; }
 
     public void Dispose() => meter.Dispose();
 }

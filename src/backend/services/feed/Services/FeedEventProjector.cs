@@ -140,6 +140,7 @@ public sealed class FeedEventProjector(
 
         video.AvailableAtUtc = completed.OccurredAtUtc;
         video.HasCompletion = true;
+        video.HasHls = completed.EventVersion == 2;
         video.SortKey = FeedSortKey.Create(completed.OccurredAtUtc, completed.VideoId);
         video.UpdatedAtUtc = now;
         video.Renditions = completed.Renditions.Select(rendition => new FeedRendition
@@ -172,12 +173,21 @@ public sealed class FeedEventProjector(
 
             if (string.Equals(envelope.Topic, topics.CompletedTopic, StringComparison.Ordinal))
             {
-                var completed = JsonSerializer.Deserialize<VideoTranscodingCompletedV1>(
-                    envelope.Payload,
-                    SerializerOptions);
-                return Validate(completed)
-                    ? new ParsedEvent(completed!.EventId, null, completed, null)
-                    : ParsedEvent.Rejected(completed?.EventId, "invalid_completed_event");
+                using var document = JsonDocument.Parse(envelope.Payload);
+                var version = document.RootElement.TryGetProperty("eventVersion", out var versionElement) ? versionElement.GetInt32() : 0;
+                if (version == 1)
+                {
+                    var completed = JsonSerializer.Deserialize<VideoTranscodingCompletedV1>(envelope.Payload, SerializerOptions);
+                    return Validate(completed) ? new ParsedEvent(completed!.EventId, null, completed, null) : ParsedEvent.Rejected(completed?.EventId, "invalid_completed_event");
+                }
+                if (version == 2)
+                {
+                    var completedV2 = JsonSerializer.Deserialize<VideoTranscodingCompletedV2>(envelope.Payload, SerializerOptions);
+                    if (!Validate(completedV2)) return ParsedEvent.Rejected(completedV2?.EventId, "invalid_completed_event");
+                    var compatible = new VideoTranscodingCompletedV1(completedV2!.EventId,completedV2.EventType,2,completedV2.OccurredAtUtc,completedV2.CausationEventId,completedV2.VideoId,completedV2.SourceBucket,completedV2.SourceObjectKey,completedV2.SourceEtag,completedV2.Renditions,completedV2.CorrelationId);
+                    return new ParsedEvent(compatible.EventId,null,compatible,null);
+                }
+                return ParsedEvent.Rejected(null, "unsupported_completed_version");
             }
 
             return ParsedEvent.Rejected(null, "unexpected_topic");
@@ -206,7 +216,7 @@ public sealed class FeedEventProjector(
             completed.EventId == Guid.Empty ||
             completed.VideoId == Guid.Empty ||
             completed.EventType != VideoTranscodingCompletedV1.Type ||
-            completed.EventVersion != VideoTranscodingCompletedV1.Version ||
+            completed.EventVersion is not (1 or 2) ||
             completed.Renditions is null ||
             completed.Renditions.Count == 0 ||
             completed.Renditions.Select(rendition => rendition.Tier).Distinct(StringComparer.Ordinal).Count() !=
@@ -226,6 +236,14 @@ public sealed class FeedEventProjector(
             string.Equals(rendition.Bucket, storage.RenditionsBucket, StringComparison.Ordinal) &&
             rendition.ObjectKey.StartsWith(requiredPrefix, StringComparison.Ordinal));
     }
+
+    private bool Validate(VideoTranscodingCompletedV2? completed) => completed is not null && completed.HlsPackage is not null &&
+        string.Equals(completed.HlsPackage.Bucket, storage.RenditionsBucket, StringComparison.Ordinal) &&
+        completed.HlsPackage.AssetPrefix == $"videos/{completed.VideoId:N}/hls/" &&
+        completed.HlsPackage.MasterPlaylistObjectKey == completed.HlsPackage.AssetPrefix + "master.m3u8" &&
+        completed.HlsPackage.Variants is not null && completed.HlsPackage.Variants.Count > 0 &&
+        completed.HlsPackage.Variants.All(variant => variant.PlaylistObjectKey == completed.HlsPackage.AssetPrefix + variant.Tier + "/index.m3u8") &&
+        Validate(new VideoTranscodingCompletedV1(completed.EventId,completed.EventType,completed.EventVersion,completed.OccurredAtUtc,completed.CausationEventId,completed.VideoId,completed.SourceBucket,completed.SourceObjectKey,completed.SourceEtag,completed.Renditions,completed.CorrelationId));
 
     private ConsumedKafkaMessage CreateConsumed(
         ConsumedEnvelope envelope,

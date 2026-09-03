@@ -34,6 +34,19 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   protected readonly errorMessage = signal('');
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly hasMore = computed(() => this.nextCursor() !== null);
+  protected readonly selectedVideo = signal<FeedVideo | null>(null);
+  protected readonly recommendations = computed(() => {
+    const selected = this.selectedVideo();
+    return selected ? this.videos().filter((video) => video.id !== selected.id) : [];
+  });
+  protected readonly categories = [
+    'All',
+    'Recently uploaded',
+    'Technology',
+    'Learning',
+    '4K',
+    'Live',
+  ];
 
   private readonly feedService = inject(FeedService);
   private readonly destroyRef = inject(DestroyRef);
@@ -44,7 +57,7 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   private activePlayer?: HTMLVideoElement;
 
   ngOnInit(): void {
-    this.loadPage(1, false);
+    this.loadPage(10, false);
   }
 
   private observeSentinel(): void {
@@ -77,7 +90,7 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   protected retry(): void {
     if (this.videos().length === 0) {
       this.initialLoading.set(true);
-      this.loadPage(1, false);
+      this.loadPage(10, false);
       return;
     }
 
@@ -89,6 +102,20 @@ export class HomeFeedPage implements OnInit, OnDestroy {
       this.activePlayer.pause();
     }
     this.activePlayer = player;
+  }
+
+  protected openWatch(video: FeedVideo): void {
+    this.activePlayer?.pause();
+    this.activePlayer = undefined;
+    this.selectedVideo.set(video);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  protected closeWatch(): void {
+    this.activePlayer?.pause();
+    this.activePlayer = undefined;
+    this.selectedVideo.set(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   private tryLoadMore(): void {

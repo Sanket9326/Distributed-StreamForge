@@ -82,7 +82,8 @@ public sealed class FfprobeMediaProbe(
                 GetString(video, "codec_name") ?? "unknown",
                 audio.ValueKind != JsonValueKind.Undefined,
                 audio.ValueKind == JsonValueKind.Undefined ? null : GetString(audio, "codec_name"),
-                duration);
+                duration,
+                ReadFrameRate(video));
         }
         catch (PermanentTranscodingException)
         {
@@ -146,6 +147,21 @@ public sealed class FfprobeMediaProbe(
         return double.TryParse(durationText, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds)
             ? TimeSpan.FromSeconds(seconds)
             : TimeSpan.Zero;
+    }
+
+    private static double ReadFrameRate(JsonElement video)
+    {
+        var value = GetString(video, "avg_frame_rate") ?? GetString(video, "r_frame_rate");
+        if (string.IsNullOrWhiteSpace(value)) return 30;
+        var parts = value.Split('/', 2);
+        if (parts.Length == 2 &&
+            double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var numerator) &&
+            double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var denominator) && denominator > 0)
+        {
+            return numerator / denominator;
+        }
+        return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var rate) && rate > 0
+            ? rate : 30;
     }
 
     private static string? GetString(JsonElement element, string propertyName) =>

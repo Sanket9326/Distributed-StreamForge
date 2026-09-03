@@ -69,7 +69,7 @@ public sealed class JobStore(
 
     public async Task<bool> CompleteAsync(
         LeasedJob leasedJob,
-        IReadOnlyList<ProcessedRendition> renditions,
+        ProcessedTranscodingResult result,
         CancellationToken cancellationToken)
     {
         return await ExecuteInTransactionAsync(async dbContext =>
@@ -81,7 +81,7 @@ public sealed class JobStore(
             }
 
             var now = timeProvider.GetUtcNow();
-            foreach (var rendition in renditions)
+            foreach (var rendition in result.Renditions)
             {
                 dbContext.Renditions.Add(new RenditionAsset
                 {
@@ -107,7 +107,8 @@ public sealed class JobStore(
             job.LeaseExpiresAtUtc = null;
             job.LastErrorCode = null;
             job.LastErrorMessage = null;
-            dbContext.OutboxMessages.Add(outcomeFactory.CreateCompleted(job, renditions, now));
+            dbContext.HlsPackages.Add(HlsPackageAsset.From(job.EventId, result.HlsPackage));
+            dbContext.OutboxMessages.Add(outcomeFactory.CreateCompleted(job, result, now));
             await dbContext.SaveChangesAsync(cancellationToken);
             return true;
         }, cancellationToken);

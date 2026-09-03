@@ -1,68 +1,168 @@
-<article class="video-card">
-  <div class="player-frame">
-    <video
-      #player
-      controls
-      playsinline
-      preload="metadata"
-      [attr.src]="sourceUrl() || null"
-      [attr.aria-label]="'Play ' + video().title"
-      (play)="onPlay()"
-      (error)="onPlaybackError()"
-    ></video>
-    @if (!sourceUrl() && !playbackError()) {
-      <div class="player-loading" aria-hidden="true">
-        <span>▶</span>
-        <small>{{ refreshing() ? 'Refreshing playback…' : 'Preparing player…' }}</small>
+@if (appearance() === 'watch') {
+  <article class="watch-card">
+    <div class="player-frame">
+      <video
+        #player
+        controls
+        playsinline
+        preload="metadata"
+        [attr.src]="sourceUrl() || null"
+        [attr.aria-label]="'Play ' + video().title"
+        (play)="onPlay()"
+        (playing)="onPlaying()"
+        (pause)="onPause()"
+        (volumechange)="onVolumeChange()"
+        (error)="onPlaybackError()"
+      ></video>
+
+      <div class="quality-control">
+        <button
+          type="button"
+          class="quality-pill"
+          [disabled]="qualityDisabled()"
+          [attr.aria-expanded]="qualityMenuOpen()"
+          aria-haspopup="menu"
+          (click)="toggleQualityMenu($event)"
+        >
+          {{ qualityLabel() }}
+        </button>
+        @if (qualityMenuOpen()) {
+          <div class="quality-menu" role="menu" aria-label="Playback quality">
+            <button
+              type="button"
+              role="menuitemradio"
+              [attr.aria-checked]="mode() === 'auto'"
+              (click)="selectAuto()"
+            >
+              Auto
+            </button>
+            @for (level of levels(); track level.index) {
+              <button
+                type="button"
+                role="menuitemradio"
+                [attr.aria-checked]="mode() === 'manual' && selectedHeight() === level.height"
+                (click)="selectLevel(level)"
+              >
+                {{ level.height }}p
+              </button>
+            }
+          </div>
+        }
       </div>
-    }
-    @if (playbackError()) {
-      <p class="player-error" role="alert">{{ playbackError() }}</p>
-    }
-  </div>
 
-  <div class="video-body">
-    <div class="video-copy">
-      <h2>{{ video().title }}</h2>
-      <p class="video-time">
-        {{ relativeUploadTime() }} · {{ video().renditions.length }} qualities
-      </p>
-    </div>
-
-    <div class="video-actions" aria-label="Video actions">
-      <button type="button" [attr.aria-pressed]="liked()" (click)="toggleLike()">
-        <span aria-hidden="true">{{ liked() ? '♥' : '♡' }}</span>
-        {{ liked() ? 'Liked' : 'Like' }}
-      </button>
-      <button type="button" [attr.aria-expanded]="commentsOpen()" (click)="toggleComments()">
-        <span aria-hidden="true">◯</span>
-        Comment
-      </button>
-    </div>
-  </div>
-
-  @if (video().hashtags.length) {
-    <p class="hashtags">
-      @for (hashtag of video().hashtags; track hashtag) {
-        <span>#{{ hashtag }}</span>
+      @if (
+        (!prepared() || startingPlayback()) && !playing() && !autoplayBlocked() && !playbackError()
+      ) {
+        <div class="player-loading" aria-hidden="true">
+          <span class="loading-spinner"></span>
+          <small>{{ refreshing() ? 'Refreshing playback…' : 'Preparing player…' }}</small>
+        </div>
       }
-    </p>
-  }
-
-  @if (video().description) {
-    <div class="description" [class.collapsed]="hasLongDescription() && !descriptionExpanded()">
-      <p>{{ video().description }}</p>
-      @if (hasLongDescription()) {
-        <button type="button" (click)="toggleDescription()">
-          {{ descriptionExpanded() ? 'Show less' : 'Show more' }}
+      @if (autoplayBlocked() && !playbackError()) {
+        <button type="button" class="player-start" (click)="startFromOverlay()">
+          <span aria-hidden="true">▶</span>
+          Play video
         </button>
       }
+      @if (startedMuted() && playing()) {
+        <button type="button" class="sound-prompt" (click)="enableSound()">
+          <span aria-hidden="true">🔊</span>
+          Tap for sound
+        </button>
+      }
+      @if (playbackError()) {
+        <p class="player-error" role="alert">{{ playbackError() }}</p>
+      }
     </div>
-  }
 
-  @if (commentsOpen()) {
-    <div class="comments-notice" role="status">
-      Comments are coming in a later iteration. Nothing is saved yet.
+    <h1 class="watch-title">{{ video().title }}</h1>
+
+    <div class="watch-toolbar">
+      <div class="channel">
+        <span class="channel-avatar" aria-hidden="true">{{ creatorInitial() }}</span>
+        <div>
+          <strong>StreamForge Creator</strong>
+          <small>Local channel</small>
+        </div>
+        <button type="button" class="subscribe-button">Subscribe</button>
+      </div>
+
+      <div class="video-actions" aria-label="Video actions">
+        <button type="button" [attr.aria-pressed]="liked()" (click)="toggleLike()">
+          <span aria-hidden="true">{{ liked() ? '♥' : '♡' }}</span>
+          {{ liked() ? 'Liked' : 'Like' }}
+        </button>
+        <button type="button"><span aria-hidden="true">↗</span> Share</button>
+        <button type="button"><span aria-hidden="true">＋</span> Save</button>
+        <button type="button" aria-label="More actions">•••</button>
+      </div>
     </div>
-  }
-</article>
+
+    <section
+      class="description-card"
+      [class.collapsed]="hasLongDescription() && !descriptionExpanded()"
+    >
+      <strong>{{ relativeUploadTime() }} · {{ video().renditions.length }} qualities</strong>
+      @if (video().hashtags.length) {
+        <span class="hashtags">
+          @for (hashtag of video().hashtags; track hashtag) {
+            #{{ hashtag }}
+          }
+        </span>
+      }
+      <p>{{ video().description || 'Uploaded to StreamForge and ready for adaptive playback.' }}</p>
+      @if (hasLongDescription()) {
+        <button type="button" (click)="toggleDescription()">
+          {{ descriptionExpanded() ? 'Show less' : '…more' }}
+        </button>
+      }
+    </section>
+
+    <button
+      class="comments-toggle"
+      type="button"
+      [attr.aria-expanded]="commentsOpen()"
+      (click)="toggleComments()"
+    >
+      <span>Comments</span
+      ><small>{{ commentsOpen() ? 'Hide discussion' : 'Join the discussion' }}</small>
+    </button>
+    @if (commentsOpen()) {
+      <div class="comments-notice" role="status">
+        Comments are coming in a later iteration. Nothing is saved yet.
+      </div>
+    }
+  </article>
+} @else {
+  <article class="browse-card" [class.recommendation-card]="appearance() === 'recommendation'">
+    <button
+      class="browse-link"
+      type="button"
+      (click)="openWatch()"
+      [attr.aria-label]="'Watch ' + video().title"
+    >
+      <span class="thumbnail">
+        <video
+          muted
+          playsinline
+          preload="metadata"
+          [attr.src]="sourceUrl() || null"
+          aria-hidden="true"
+        ></video>
+        <span class="thumbnail-shade"></span>
+        <span class="preview-play" aria-hidden="true">▶</span>
+        <span class="quality-badge">{{ video().hlsManifestUrl ? 'HD · AUTO' : 'MP4' }}</span>
+      </span>
+
+      <span class="browse-details">
+        <span class="browse-avatar" aria-hidden="true">{{ creatorInitial() }}</span>
+        <span class="browse-copy">
+          <strong>{{ video().title }}</strong>
+          <small>StreamForge Creator</small>
+          <small>{{ video().renditions.length }} qualities · {{ relativeUploadTime() }}</small>
+        </span>
+        <span class="more-button" aria-hidden="true">⋮</span>
+      </span>
+    </button>
+  </article>
+}

@@ -10,6 +10,8 @@ describe('HomeFeedPage', () => {
   let observers: MockIntersectionObserver[];
 
   beforeEach(async () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     originalObserver = globalThis.IntersectionObserver;
     observers = [];
     class TestObserver extends MockIntersectionObserver {
@@ -34,11 +36,12 @@ describe('HomeFeedPage', () => {
     else
       delete (globalThis as { IntersectionObserver?: typeof IntersectionObserver })
         .IntersectionObserver;
+    vi.restoreAllMocks();
   });
 
-  it('loads one video initially and waits for user scroll before requesting ten more', () => {
+  it('loads the first grid page and waits for user scroll before requesting more', () => {
     const initial = http.expectOne(
-      (request) => request.url === '/api/feed/videos' && request.params.get('limit') === '1',
+      (request) => request.url === '/api/feed/videos' && request.params.get('limit') === '10',
     );
     initial.flush({ items: [video()], nextCursor: 'opaque-cursor' });
     fixture.detectChanges();
@@ -60,6 +63,28 @@ describe('HomeFeedPage', () => {
         request.params.get('cursor') === 'opaque-cursor',
     );
     next.flush({ items: [], nextCursor: null });
+  });
+
+  it('opens a browse card in the full watch layout', async () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const initial = http.expectOne(
+      (request) => request.url === '/api/feed/videos' && request.params.get('limit') === '10',
+    );
+    initial.flush({ items: [video()], nextCursor: null });
+    fixture.detectChanges();
+
+    const browseLink = fixture.nativeElement.querySelector('.browse-link') as HTMLButtonElement;
+    browseLink.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.watch-shell')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.watch-title').textContent).toContain(
+      'First video',
+    );
+    expect(fixture.nativeElement.textContent).toContain('Back to Home');
+    await vi.waitFor(() => expect(HTMLMediaElement.prototype.play).toHaveBeenCalled());
+    expect(scrollTo).toHaveBeenCalled();
+    scrollTo.mockRestore();
   });
 
   function video() {

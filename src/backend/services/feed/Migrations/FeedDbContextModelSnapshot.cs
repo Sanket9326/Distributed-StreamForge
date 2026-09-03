@@ -152,6 +152,10 @@ namespace StreamForge.Feed.Api.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("has_completion");
 
+                    b.Property<bool>("HasHls")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_hls");
+
                     b.Property<bool>("HasMetadata")
                         .HasColumnType("boolean")
                         .HasColumnName("has_metadata");

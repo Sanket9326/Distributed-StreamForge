@@ -73,8 +73,8 @@ public sealed class TranscodingJobService(
         var heartbeat = MaintainLeaseAsync(job, jobSource, stoppingToken);
         try
         {
-            var renditions = await pipeline.ProcessAsync(job, jobSource.Token);
-            if (await jobStore.CompleteAsync(job, renditions, stoppingToken))
+            var result = await pipeline.ProcessAsync(job, jobSource.Token);
+            if (await jobStore.CompleteAsync(job, result, stoppingToken))
             {
                 logger.LogInformation(
                     "Completed transcoding event {EventId} for video {VideoId}",
