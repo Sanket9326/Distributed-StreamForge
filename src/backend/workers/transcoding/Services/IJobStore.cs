@@ -9,7 +9,7 @@ public interface IJobStore
 
     Task<bool> CompleteAsync(
         LeasedJob job,
-        IReadOnlyList<ProcessedRendition> renditions,
+        ProcessedTranscodingResult result,
         CancellationToken cancellationToken);
 
     Task<bool> ScheduleRetryAsync(

@@ -1,21 +1,83 @@
 <div class="app-shell">
-  <header class="masthead">
-    <a class="brand" routerLink="/" aria-label="StreamForge home">
-      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-      <span>StreamForge</span>
-    </a>
-
-    <nav aria-label="Primary navigation">
-      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-        Home
+  <header class="topbar">
+    <div class="topbar-start">
+      <button class="icon-button menu-button" type="button" aria-label="Open navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="brand" routerLink="/" aria-label="StreamForge home">
+        <span class="brand-mark" aria-hidden="true">▶</span>
+        <span>StreamForge</span>
       </a>
-      <a routerLink="/upload" routerLinkActive="active">Upload</a>
-    </nav>
+    </div>
 
-    <span class="environment"><i></i> Local</span>
+    <form class="search" role="search" (submit)="$event.preventDefault()">
+      <label class="sr-only" for="site-search">Search videos</label>
+      <input id="site-search" type="search" placeholder="Search" autocomplete="off" />
+      <button type="submit" aria-label="Search"><span aria-hidden="true"></span></button>
+    </form>
+
+    <div class="topbar-actions">
+      <button class="icon-button mobile-search-button" type="button" aria-label="Search videos">
+        <span aria-hidden="true"></span>
+      </button>
+      <a class="create-button" routerLink="/upload">
+        <span aria-hidden="true">＋</span><span class="create-label">Create</span>
+      </a>
+      <button class="icon-button notification-button" type="button" aria-label="Notifications">
+        <span aria-hidden="true">♢</span><i></i>
+      </button>
+      <span class="profile-avatar" aria-label="Local profile">SF</span>
+    </div>
   </header>
 
-  <router-outlet />
+  <aside class="sidebar" aria-label="Primary navigation">
+    <nav>
+      <a
+        aria-label="Home"
+        routerLink="/"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        <span aria-hidden="true">⌂</span> Home
+      </a>
+      <a aria-label="Explore" href="#explore"><span aria-hidden="true">◉</span> Explore</a>
+      <a aria-label="Upload" routerLink="/upload" routerLinkActive="active"
+        ><span aria-hidden="true">↑</span> Upload</a
+      >
+    </nav>
+
+    <div class="sidebar-section">
+      <h2>You</h2>
+      <a href="#history"><span aria-hidden="true">↺</span> History</a>
+      <a href="#liked"><span aria-hidden="true">♡</span> Liked videos</a>
+    </div>
+
+    <div class="sidebar-section">
+      <h2>Discover</h2>
+      <a href="#trending"><span aria-hidden="true">⌁</span> Trending</a>
+      <a href="#technology"><span aria-hidden="true">#</span> Technology</a>
+      <a href="#learning"><span aria-hidden="true">◇</span> Learning</a>
+    </div>
+
+    <footer>
+      <span>StreamForge local</span>
+      <small>Adaptive video, forged simply.</small>
+    </footer>
+  </aside>
+
+  <nav class="mobile-nav" aria-label="Mobile navigation">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      <span aria-hidden="true">⌂</span><small>Home</small>
+    </a>
+    <a href="#explore"><span aria-hidden="true">◉</span><small>Explore</small></a>
+    <a routerLink="/upload" routerLinkActive="active">
+      <span aria-hidden="true">↑</span><small>Upload</small>
+    </a>
+  </nav>
+
+  <div class="page-content">
+    <router-outlet />
+  </div>
 </div>
 
 @if (completions.toast(); as toast) {
@@ -24,7 +86,7 @@
     <div>
       <strong>Your video is ready</strong>
       <p>{{ toast.title }} finished processing.</p>
-      <a routerLink="/" (click)="completions.dismissToast()">View Home</a>
+      <a routerLink="/" (click)="completions.dismissToast()">Watch now</a>
     </div>
     <button type="button" aria-label="Dismiss notification" (click)="completions.dismissToast()">
       ×

@@ -5,7 +5,7 @@ namespace StreamForge.Transcoding.IntegrationTests;
 
 public sealed class FakeTranscodingPipeline : ITranscodingPipeline
 {
-    public Task<IReadOnlyList<ProcessedRendition>> ProcessAsync(
+    public Task<ProcessedTranscodingResult> ProcessAsync(
         LeasedJob job,
         CancellationToken cancellationToken)
     {
@@ -30,6 +30,9 @@ public sealed class FakeTranscodingPipeline : ITranscodingPipeline
                 "rendition-etag",
                 1_024)
         ];
-        return Task.FromResult(renditions);
+        var prefix = $"videos/{job.VideoId:N}/hls/";
+        return Task.FromResult(new ProcessedTranscodingResult(renditions,
+            new ProcessedHlsPackage("streamforge-renditions", prefix, prefix + "master.m3u8", "master-etag", "fmp4", 4, 10, 2048,
+                [new ProcessedHlsVariant("480p",854,480,30,"h264","aac","avc1.4d401f,mp4a.40.2",1_628_000,1_200_000,prefix+"480p/index.m3u8","playlist-etag",3,2048)])));
     }
 }

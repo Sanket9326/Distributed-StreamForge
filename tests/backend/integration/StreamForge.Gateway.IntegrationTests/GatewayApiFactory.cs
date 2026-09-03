@@ -60,6 +60,11 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             await context.Response.WriteAsync(
                 "event: completed\ndata: {\"videoId\":\"e2c1bb10-4340-452f-9fc6-a68cf4b12457\"}\n\n");
         });
+        downstream.MapGet("/api/playback/videos/{videoId:guid}/master.m3u8", async context =>
+        {
+            context.Response.ContentType = "application/vnd.apple.mpegurl";
+            await context.Response.WriteAsync("#EXTM3U\n");
+        });
 
         await downstream.StartAsync();
         downstreamAddress = downstream.Services
@@ -94,6 +99,8 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address"] =
                     $"{downstreamAddress}/",
                 ["ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address"] =
+                    $"{downstreamAddress}/",
+                ["ReverseProxy:Clusters:playback-cluster:Destinations:playback-service:Address"] =
                     $"{downstreamAddress}/"
             });
         });

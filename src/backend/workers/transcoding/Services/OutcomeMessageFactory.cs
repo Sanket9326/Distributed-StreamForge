@@ -14,20 +14,20 @@ public sealed class OutcomeMessageFactory(IOptions<KafkaOptions> options)
 
     public OutboxMessage CreateCompleted(
         TranscodingJob job,
-        IReadOnlyList<ProcessedRendition> renditions,
+        ProcessedTranscodingResult result,
         DateTimeOffset occurredAtUtc)
     {
-        var contract = new VideoTranscodingCompletedV1(
+        var contract = new VideoTranscodingCompletedV2(
             Guid.NewGuid(),
-            VideoTranscodingCompletedV1.Type,
-            VideoTranscodingCompletedV1.Version,
+            VideoTranscodingCompletedV2.Type,
+            VideoTranscodingCompletedV2.Version,
             occurredAtUtc,
             job.EventId,
             job.VideoId,
             job.SourceBucket,
             job.SourceObjectKey,
             job.SourceEtag,
-            renditions.Select(rendition => new RenditionV1(
+            result.Renditions.Select(rendition => new RenditionV1(
                 rendition.Tier,
                 rendition.Width,
                 rendition.Height,
@@ -38,6 +38,15 @@ public sealed class OutcomeMessageFactory(IOptions<KafkaOptions> options)
                 rendition.ObjectKey,
                 rendition.Etag,
                 rendition.SizeBytes)).ToArray(),
+            new HlsPackageV2(result.HlsPackage.Bucket, result.HlsPackage.AssetPrefix,
+                result.HlsPackage.MasterPlaylistObjectKey, result.HlsPackage.MasterPlaylistEtag,
+                result.HlsPackage.SegmentFormat, result.HlsPackage.TargetSegmentDurationSeconds,
+                result.HlsPackage.DurationSeconds, result.HlsPackage.TotalSizeBytes,
+                result.HlsPackage.Variants.Select(variant => new HlsVariantV2(
+                    variant.Tier, variant.Width, variant.Height, variant.FrameRate, variant.VideoCodec,
+                    variant.AudioCodec, variant.Codecs, variant.BandwidthBitsPerSecond,
+                    variant.AverageBandwidthBitsPerSecond, variant.PlaylistObjectKey,
+                    variant.PlaylistEtag, variant.SegmentCount, variant.SizeBytes)).ToArray()),
             job.CorrelationId);
         return Create(
             contract.EventId,

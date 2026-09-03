@@ -118,6 +118,10 @@ Stop containers while preserving objects, database rows, and Kafka logs:
 docker compose -f infra/docker/compose.yml down
 ```
 
+Compose sets Kafka's `log.dirs` to the mounted `kafka-data` volume. Keep that
+path and volume aligned: resetting Kafka while retaining PostgreSQL can reuse
+topic offsets that the consumers have already recorded as processed.
+
 To permanently delete all local MinIO, PostgreSQL, Kafka, and pgAdmin data,
 explicitly include `--volumes`. This cannot be undone:
 
@@ -164,6 +168,16 @@ docker compose -f infra/docker/compose.yml down --volumes
 | Feed | `ObjectStorage:PublicEndpoint` | Required browser-visible signing endpoint |
 | Feed | `ObjectStorage:RenditionsBucket` | `streamforge-renditions` |
 | Feed | `ObjectStorage:SignedUrlExpirySeconds` | `3600` |
+| Playback | `ConnectionStrings:PlaybackDatabase` | Required; isolated `playback` schema |
+| Playback | `Kafka:ConsumerGroupId` | `streamforge-playback-v1` |
+| Playback | `Playback:SignedUrlExpirySeconds` | `3600` |
+| Transcoding | `Transcoding:HlsSegmentDurationSeconds` / `AssetUploadConcurrency` | `4` / `4` |
+
+Compose restricts MinIO's cluster-wide CORS origins to
+`http://localhost:8080` and `http://localhost:4200` through
+`MINIO_API_CORS_ALLOW_ORIGIN`; the rendition bucket remains private. Community
+MinIO enables CORS for supported HTTP methods but does not implement the
+per-bucket `PutBucketCors` API.
 
 Use double underscores for environment-variable configuration segments. Do not
 commit `.env`, secrets, local paths, or uploaded media. `.env.example` contains

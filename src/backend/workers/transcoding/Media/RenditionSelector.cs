@@ -3,7 +3,7 @@ namespace StreamForge.Transcoding.Worker.Media;
 /// <summary>Selects standard, non-upscaled output tiers for a probed source.</summary>
 public sealed class RenditionSelector
 {
-    private static readonly int[] StandardHeights = [480, 720, 1080];
+    private static readonly int[] StandardHeights = [360, 480, 720, 1080];
 
     public IReadOnlyList<RenditionDefinition> Select(MediaInfo source)
     {
@@ -29,9 +29,10 @@ public sealed class RenditionSelector
             (int)(2 * Math.Round(scaledWidth / 2, MidpointRounding.AwayFromZero)));
         var profile = height switch
         {
-            <= 480 => (Crf: 23, MaxRate: "1500k", BufferSize: "3000k", AudioRate: "96k"),
+            <= 360 => (Crf: 23, MaxRate: "800k", BufferSize: "1600k", AudioRate: "128k"),
+            <= 480 => (Crf: 23, MaxRate: "1500k", BufferSize: "3000k", AudioRate: "128k"),
             <= 720 => (Crf: 22, MaxRate: "3000k", BufferSize: "6000k", AudioRate: "128k"),
-            _ => (Crf: 21, MaxRate: "6000k", BufferSize: "12000k", AudioRate: "192k")
+            _ => (Crf: 21, MaxRate: "6000k", BufferSize: "12000k", AudioRate: "128k")
         };
         return new RenditionDefinition(
             $"{height}p",
@@ -40,7 +41,8 @@ public sealed class RenditionSelector
             profile.Crf,
             profile.MaxRate,
             profile.BufferSize,
-            profile.AudioRate);
+            profile.AudioRate,
+            Math.Min(source.FrameRate <= 0 ? 30 : source.FrameRate, 30));
     }
 
     private static int MakeEven(int value) => Math.Max(2, value - Math.Abs(value % 2));
@@ -53,4 +55,5 @@ public sealed record RenditionDefinition(
     int Crf,
     string MaximumVideoRate,
     string VideoBufferSize,
-    string AudioRate);
+    string AudioRate,
+    double FrameRate = 30);

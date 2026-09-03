@@ -39,6 +39,8 @@ builder.Services.AddOptions<TranscodingOptions>()
     .Validate(options => options.JobTimeoutSeconds > 0, "JobTimeoutSeconds must be greater than zero.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.ScratchPath), "ScratchPath is required.")
     .Validate(options => options.MinimumFreeScratchBytes >= 0, "MinimumFreeScratchBytes cannot be negative.")
+    .Validate(options => options.HlsSegmentDurationSeconds > 0, "HlsSegmentDurationSeconds must be positive.")
+    .Validate(options => options.AssetUploadConcurrency > 0, "AssetUploadConcurrency must be positive.")
     .ValidateOnStart();
 builder.Services.AddOptions<MediaToolOptions>()
     .BindConfiguration(MediaToolOptions.SectionName)
@@ -84,6 +86,10 @@ builder.Services.AddSingleton<RenditionSelector>();
 builder.Services.AddSingleton<GeneratedMediaValidator>();
 builder.Services.AddSingleton<RenditionKeyFactory>();
 builder.Services.AddSingleton<IVideoEncoder, FfmpegVideoEncoder>();
+builder.Services.AddSingleton<IHlsPackager, FfmpegHlsPackager>();
+builder.Services.AddSingleton<HlsPackageValidator>();
+builder.Services.AddSingleton<HlsManifestBuilder>();
+builder.Services.AddSingleton<HlsObjectKeyFactory>();
 builder.Services.AddSingleton<ITranscodingPipeline, TranscodingPipeline>();
 builder.Services.AddSingleton<IKafkaOutboxPublisher, KafkaOutboxPublisher>();
 builder.Services.AddScoped<IMessageIngestor, MessageIngestor>();

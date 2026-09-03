@@ -25,7 +25,11 @@ public sealed class OutcomeMessageFactoryTests
             "etag",
             1234);
 
-        var message = factory.CreateCompleted(job, [rendition], DateTimeOffset.UnixEpoch);
+        var prefix = $"videos/{job.VideoId:N}/hls/";
+        var result = new ProcessedTranscodingResult([rendition], new ProcessedHlsPackage(
+            "streamforge-renditions", prefix, prefix + "master.m3u8", "master-etag", "fmp4", 4, 10, 100,
+            [new ProcessedHlsVariant("480p",854,480,30,"h264","aac","avc1.4d401f,mp4a.40.2",1_628_000,1_200_000,prefix+"480p/index.m3u8","etag",3,100)]));
+        var message = factory.CreateCompleted(job, result, DateTimeOffset.UnixEpoch);
 
         Assert.Equal("video-transcoding-completed", message.Topic);
         Assert.NotEqual("video-processing", message.Topic);
@@ -34,6 +38,7 @@ public sealed class OutcomeMessageFactoryTests
         Assert.Equal("video.transcoding.completed", payload.RootElement.GetProperty("eventType").GetString());
         Assert.Equal(job.EventId, payload.RootElement.GetProperty("causationEventId").GetGuid());
         Assert.Equal("480p", payload.RootElement.GetProperty("renditions")[0].GetProperty("tier").GetString());
+        Assert.Equal(2, payload.RootElement.GetProperty("eventVersion").GetInt32());
     }
 
     [Fact]

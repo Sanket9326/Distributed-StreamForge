@@ -106,6 +106,7 @@ public sealed class FeedQueryService(
             video.Hashtags,
             video.UploadedAtUtc!.Value,
             video.AvailableAtUtc!.Value,
+            video.HasHls ? $"/api/playback/videos/{video.Id:D}/master.m3u8" : null,
             await MapRenditionsAsync(video.Renditions, cancellationToken));
 
     private async Task<IReadOnlyList<FeedRenditionResponse>> MapRenditionsAsync(

@@ -1,0 +1,6 @@
+using Confluent.Kafka; using Microsoft.Extensions.Options; using StreamForge.Playback.Api.Options;
+namespace StreamForge.Playback.Api.Services;
+public sealed class KafkaConsumerService(IServiceScopeFactory scopes,IOptions<KafkaOptions> options,ILogger<KafkaConsumerService> logger):BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken){var o=options.Value;using var consumer=new ConsumerBuilder<string,string>(new ConsumerConfig{BootstrapServers=o.BootstrapServers,GroupId=o.ConsumerGroupId,AutoOffsetReset=AutoOffsetReset.Earliest,EnableAutoCommit=false}).Build();consumer.Subscribe(o.CompletedTopic);while(!stoppingToken.IsCancellationRequested){ConsumeResult<string,string>? item=null;try{item=consumer.Consume(stoppingToken);using var scope=scopes.CreateScope();await scope.ServiceProvider.GetRequiredService<CompletionProjector>().ProjectAsync(new(item.Topic,item.Partition.Value,item.Offset.Value,item.Message.Value),stoppingToken);consumer.Commit(item);}catch(OperationCanceledException)when(stoppingToken.IsCancellationRequested){break;}catch(Exception ex){logger.LogError(ex,"Playback projection failed");if(item is not null)try{consumer.Seek(item.TopicPartitionOffset);}catch(KafkaException){}await Task.Delay(1000,stoppingToken);}}consumer.Close();}
+}

@@ -116,6 +116,13 @@ Rows appear publicly only when metadata, completion, and at least one rendition
 are present. Replayed offsets and event IDs are safe because Feed deduplicates
 them transactionally.
 
+If PostgreSQL contains a consumed `(topic, partition, offset)` that identifies a
+different event at the same current Kafka offset, Kafka storage was reset while
+database state was retained. Stop producers and consumers before clearing the
+affected local-development checkpoints and replaying the outbox event. Do not
+automatically truncate checkpoints during normal startup; with persistent Kafka
+logs, doing so would cause already processed events to be replayed.
+
 ## A signed video does not play
 
 Confirm the browser can reach `http://localhost:9000` and that the Feed response
@@ -124,3 +131,13 @@ public. Feed signs URLs using the browser-visible endpoint but verifies storage
 through the private `minio:9000` endpoint. The Web client refreshes an expiring
 URL once; persistent `403` or `404` responses indicate clock skew, mismatched
 credentials/endpoints, or a rendition object removed after its completion event.
+
+## Adaptive playback returns 503
+
+A V1 completion is intentionally ignored by Playback and has a null Feed
+`hlsManifestUrl`. For V2, inspect `playback.packages`, `playback.variants`, and the
+projected private object keys. Playback returns `Retry-After: 1` for projection
+lag or temporarily unavailable storage. If signed segment requests fail, verify
+the MinIO container has `MINIO_API_CORS_ALLOW_ORIGIN` set to the Web origin and
+inspect the browser's preflight response. The Web client reloads the stable
+manifest once for fresh signatures and then falls back to a Feed-signed MP4.

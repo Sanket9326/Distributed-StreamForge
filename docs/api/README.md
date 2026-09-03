@@ -123,6 +123,21 @@ ID. The payload uses camel case:
 }
 ```
 
+## Video transcoding completed V2
+
+Completion version 2 retains every V1 source and `renditions` field and adds an
+`hlsPackage` with package coordinates and measured variant summaries. The event
+type and completed topic are unchanged; consumers accept both versions.
+
+## Adaptive playback
+
+`GET /api/playback/videos/{videoId}/master.m3u8` rewrites a V2 package master to
+Playback variant endpoints. `GET
+/api/playback/videos/{videoId}/variants/{tier}.m3u8` returns a VOD media playlist
+with one-hour signed MinIO initialization and segment URLs. Responses use
+`application/vnd.apple.mpegurl` and `Cache-Control: private, no-store`. Projection
+lag or temporarily unavailable storage returns `503` with `Retry-After: 1`.
+
 ## Video transcoding failed event
 
 A valid job that cannot complete publishes `VideoTranscodingFailedV1` to
@@ -164,6 +179,7 @@ null `nextCursor` means there are no older ready videos.
       "hashtags": ["dotnet", "video"],
       "uploadedAtUtc": "2026-08-31T10:30:00Z",
       "availableAtUtc": "2026-08-31T10:35:00Z",
+      "hlsManifestUrl": "/api/playback/videos/e2c1bb10-4340-452f-9fc6-a68cf4b12457/master.m3u8",
       "renditions": [
         {
           "tier": "1080p",

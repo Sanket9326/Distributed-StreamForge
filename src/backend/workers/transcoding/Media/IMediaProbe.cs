@@ -16,4 +16,5 @@ public sealed record MediaInfo(
     string VideoCodec,
     bool HasAudio,
     string? AudioCodec,
-    TimeSpan Duration);
+    TimeSpan Duration,
+    double FrameRate = 30);

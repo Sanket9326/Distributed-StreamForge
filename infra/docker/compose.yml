@@ -24,12 +24,15 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ReverseProxy__Clusters__upload-cluster__Destinations__upload-service__Address: http://upload-service:8080/
       ReverseProxy__Clusters__feed-cluster__Destinations__feed-service__Address: http://feed-service:8080/
+      ReverseProxy__Clusters__playback-cluster__Destinations__playback-service__Address: http://playback-service:8080/
     expose:
       - "8080"
     depends_on:
       upload-service:
         condition: service_healthy
       feed-service:
+        condition: service_healthy
+      playback-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
@@ -150,6 +153,37 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  playback-service:
+    build:
+      context: ../../src/backend/services/playback
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__PlaybackDatabase: Host=postgres;Port=5432;Database=${STREAMFORGE_POSTGRES_DATABASE:?Copy .env.example to .env};Username=${STREAMFORGE_POSTGRES_USER:?Copy .env.example to .env};Password=${STREAMFORGE_POSTGRES_PASSWORD:?Copy .env.example to .env}
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__ConsumerGroupId: streamforge-playback-v1
+      Kafka__CompletedTopic: video-transcoding-completed
+      ObjectStorage__Endpoint: minio:9000
+      ObjectStorage__PublicEndpoint: localhost:9000
+      ObjectStorage__AccessKey: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
+      ObjectStorage__SecretKey: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
+      ObjectStorage__RenditionsBucket: streamforge-renditions
+      Playback__SignedUrlExpirySeconds: "3600"
+    expose: ["8080"]
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
   postgres:
     image: postgres:18.6-alpine
     environment:
@@ -193,6 +227,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
       MINIO_ROOT_PASSWORD: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:8080,http://localhost:4200
     expose:
       - "9000"
     ports:
@@ -224,6 +259,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
       KAFKA_NUM_PARTITIONS: "1"
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     expose:
       - "9092"
     volumes:

@@ -24,4 +24,8 @@ public sealed class TranscodingOptions
     public string ScratchPath { get; init; } = "/tmp/streamforge-transcoding";
 
     public long MinimumFreeScratchBytes { get; init; } = 2_147_483_648;
+
+    public int HlsSegmentDurationSeconds { get; init; } = 4;
+
+    public int AssetUploadConcurrency { get; init; } = 4;
 }

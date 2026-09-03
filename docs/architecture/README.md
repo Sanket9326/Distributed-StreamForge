@@ -14,12 +14,14 @@ Web / Nginx -> Gateway / YARP -> Upload -> private MinIO source object
                                                                   |
                                                                   v
                                               Transcoding intake -> PostgreSQL jobs/outbox
-                                                                  -> FFmpeg renditions in MinIO
+                                                                  -> FFmpeg MP4 + CMAF HLS in MinIO
                                                                   -> completed/failed Kafka topics
                                                                                |
                                       Feed PostgreSQL projection <--------------'
                                                 |
-                         signed rendition options through Gateway -> Web
+                         Feed metadata + stable HLS URL through Gateway -> Web
+                         Playback signed HLS manifests through Gateway -> Web
+                         Browser -> signed private segments directly from MinIO
 ```
 
 The Web application, Gateway, Upload service, and Feed service are separate build
@@ -58,7 +60,7 @@ uses the video ID as the Kafka key; future consumers must deduplicate by event I
 | Upload | Source ingestion, private object storage, ingestion metadata, and event outbox |
 | Processing | Proposed future cross-service workflow orchestration |
 | Transcoding | Durable job state, retries, FFmpeg probing, and MP4 renditions |
-| Playback | Manifests, playback authorization, delivery metadata |
+| Playback | V2 HLS projection, strict manifest rewriting, and signed private segment delivery |
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |
 
@@ -69,3 +71,5 @@ See [ADR 0002](decisions/0002-async-video-ingestion.md) for durability and
 ownership decisions and [ADR 0003](decisions/0003-durable-video-transcoding.md)
 for rendition processing and outcome topics. See [ADR 0004](decisions/0004-feed-read-model-and-progressive-playback.md)
 for the Feed projection and signed playback decision.
+See [ADR 0005](decisions/0005-adaptive-hls-playback.md) for adaptive HLS and the
+implemented Playback boundary.

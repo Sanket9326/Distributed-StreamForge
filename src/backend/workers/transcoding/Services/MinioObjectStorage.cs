@@ -75,6 +75,14 @@ public sealed class MinioObjectStorage(
         string filePath,
         IReadOnlyDictionary<string, string> metadata,
         CancellationToken cancellationToken)
+        => await UploadAssetAsync(objectKey, filePath, "video/mp4", metadata, cancellationToken);
+
+    public async Task<StoredObjectInfo> UploadAssetAsync(
+        string objectKey,
+        string filePath,
+        string contentType,
+        IReadOnlyDictionary<string, string> metadata,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -84,7 +92,7 @@ public sealed class MinioObjectStorage(
                     .WithBucket(RenditionsBucket)
                     .WithObject(objectKey)
                     .WithFileName(filePath)
-                    .WithContentType("video/mp4")
+                    .WithContentType(contentType)
                     .WithHeaders(headers),
                 cancellationToken);
             var info = new FileInfo(filePath);
@@ -93,7 +101,7 @@ public sealed class MinioObjectStorage(
                 objectKey,
                 NormalizeEtag(response.Etag),
                 info.Length,
-                "video/mp4");
+                contentType);
         }
         catch (Exception exception) when (IsStorageFailure(exception))
         {

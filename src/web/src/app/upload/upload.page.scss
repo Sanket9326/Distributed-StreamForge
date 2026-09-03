@@ -2,9 +2,9 @@
   display: block;
 }
 .upload-shell {
-  width: min(900px, calc(100% - 40px));
+  width: min(900px, calc(100% - clamp(24px, 4vw, 48px)));
   margin: 0 auto;
-  padding: 50px 0 80px;
+  padding: clamp(28px, 5vw, 50px) 0 80px;
 }
 .page-heading {
   margin-bottom: 30px;
@@ -301,13 +301,14 @@ h1 {
   margin: 5px 0 0;
   color: #8992a0;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .action-row {
   display: flex;
   gap: 12px;
   margin-top: 12px;
 }
-@media (max-width: 680px) {
+@media (max-width: 760px) {
   .upload-shell {
     width: min(100% - 24px, 900px);
     padding-top: 28px;
@@ -326,5 +327,71 @@ h1 {
   }
   .primary-action.compact {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-heading {
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-size: 31px;
+  }
+
+  .page-heading > span {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .workspace {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .metadata-form {
+    gap: 15px;
+  }
+
+  .drop-zone {
+    min-height: 190px;
+    padding: 18px 12px;
+  }
+
+  .drop-label {
+    text-align: center;
+  }
+
+  .drop-label strong {
+    font-size: 16px;
+  }
+
+  .file-card {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    gap: 10px;
+  }
+
+  .file-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .rules {
+    gap: 8px 16px;
+    letter-spacing: 0.06em;
+  }
+
+  .status-panel {
+    padding: 14px;
+  }
+}
+
+@media (pointer: coarse) {
+  .field-group input,
+  .primary-action,
+  .secondary-action,
+  .icon-button,
+  .text-action {
+    min-height: 44px;
   }
 }

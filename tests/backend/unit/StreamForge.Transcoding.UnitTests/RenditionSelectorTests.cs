@@ -13,6 +13,7 @@ public sealed class RenditionSelectorTests
 
         Assert.Collection(
             renditions,
+            rendition => AssertRendition(rendition, "360p", 640, 360, 23, "800k"),
             rendition => AssertRendition(rendition, "480p", 854, 480, 23, "1500k"),
             rendition => AssertRendition(rendition, "720p", 1280, 720, 22, "3000k"),
             rendition => AssertRendition(rendition, "1080p", 1920, 1080, 21, "6000k"));
@@ -23,7 +24,7 @@ public sealed class RenditionSelectorTests
     {
         var renditions = selector.Select(new MediaInfo(1280, 720, "vp9", false, null, TimeSpan.FromSeconds(10)));
 
-        Assert.Equal(["480p", "720p"], renditions.Select(rendition => rendition.Tier));
+        Assert.Equal(["360p", "480p", "720p"], renditions.Select(rendition => rendition.Tier));
     }
 
     [Fact]

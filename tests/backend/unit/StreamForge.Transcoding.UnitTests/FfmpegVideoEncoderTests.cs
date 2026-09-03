@@ -29,14 +29,15 @@ public sealed class FfmpegVideoEncoderTests
     }
 
     [Fact]
-    public void BuildArguments_WithoutAudio_DisablesAudioOutput()
+    public void BuildArguments_WithoutAudio_AddsSilentAacTrack()
     {
         var rendition = new RenditionDefinition("480p", 854, 480, 23, "1500k", "3000k", "96k");
 
         var arguments = FfmpegVideoEncoder.BuildArguments("source", "output", rendition, hasAudio: false);
 
-        Assert.Contains("-an", arguments);
-        Assert.DoesNotContain("aac", arguments);
+        Assert.Contains("anullsrc=channel_layout=stereo:sample_rate=48000", arguments);
+        AssertArgumentPair(arguments, "-c:a", "aac");
+        AssertArgumentPair(arguments, "-b:a", "96k");
     }
 
     private static void AssertArgumentPair(IReadOnlyList<string> arguments, string name, string value)
