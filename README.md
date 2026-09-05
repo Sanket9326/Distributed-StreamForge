@@ -47,8 +47,8 @@ docker compose -f infra/docker/compose.yml up --build
 The first build compiles the pinned MinIO Community release from its official
 source tag. The local interfaces are:
 
-- StreamForge: `http://localhost:8080`
-- Signed MinIO media API: `http://localhost:9000` (signed URLs only)
+- StreamForge: `https://localhost:8443`
+- Signed MinIO media API: `https://localhost:9443` (signed URLs only)
 - pgAdmin: `http://localhost:5050`
 - MinIO Console: `http://localhost:9001`
 
@@ -68,3 +68,7 @@ See [development setup](docs/development/setup.md) for configuration and cleanup
 [API documentation](docs/api/README.md) for HTTP and event contracts, the
 [architecture](docs/architecture/README.md) for ownership, and the
 [ingestion runbook](docs/operations/runbooks/README.md) for dependency failures.
+
+User registration, login and logout are implemented with PostgreSQL accounts and
+24-hour Redis sessions. Browsing/playback stay public; uploads require login.
+See [HTTPS setup and authentication operations](docs/operations/runbooks/authentication.md).

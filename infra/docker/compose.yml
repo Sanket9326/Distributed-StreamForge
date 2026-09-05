@@ -6,9 +6,13 @@ services:
       context: ../../src/web
     ports:
       - "8080:8080"
+      - "8443:8443"
+      - "9443:9443"
+    volumes:
+      - ../../.certs:/etc/streamforge/tls:ro
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
       interval: 10s
@@ -18,10 +22,17 @@ services:
     restart: unless-stopped
 
   gateway:
+    entrypoint: ["/bin/sh", "/etc/streamforge/start.sh"]
+    volumes:
+      - gateway-keys:/home/app/.aspnet/DataProtection-Keys
+      - ./gateway/start.sh:/etc/streamforge/start.sh:ro
     build:
       context: ../../src/backend/gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Redis: redis:6379,password=${STREAMFORGE_REDIS_PASSWORD:?Set Redis password},abortConnect=false,connectTimeout=2000,asyncTimeout=2000
+      DataProtection__KeysPath: /home/app/.aspnet/DataProtection-Keys
+      ReverseProxy__Clusters__identity-cluster__Destinations__identity-service__Address: http://identity-service:8080/
       ReverseProxy__Clusters__upload-cluster__Destinations__upload-service__Address: http://upload-service:8080/
       ReverseProxy__Clusters__feed-cluster__Destinations__feed-service__Address: http://feed-service:8080/
       ReverseProxy__Clusters__playback-cluster__Destinations__playback-service__Address: http://playback-service:8080/
@@ -40,6 +51,42 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
+    restart: unless-stopped
+
+  identity-service:
+    build:
+      context: ../../src/backend/services/identity
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__IdentityDatabase: Host=postgres;Port=5432;Database=${STREAMFORGE_POSTGRES_DATABASE:?Copy .env.example to .env};Username=${STREAMFORGE_POSTGRES_USER:?Copy .env.example to .env};Password=${STREAMFORGE_POSTGRES_PASSWORD:?Copy .env.example to .env}
+      ConnectionStrings__Redis: redis:6379,password=${STREAMFORGE_REDIS_PASSWORD:?Set Redis password},abortConnect=false,connectTimeout=2000,asyncTimeout=2000
+    expose: ["8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2.1-alpine
+    environment:
+      STREAMFORGE_REDIS_PASSWORD: ${STREAMFORGE_REDIS_PASSWORD:?Set Redis password}
+    entrypoint: ["/bin/sh", "/etc/streamforge/start.sh"]
+    volumes:
+      - ./redis/start.sh:/etc/streamforge/start.sh:ro
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$STREAMFORGE_REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   upload-service:
@@ -127,12 +174,12 @@ services:
       Kafka__UploadedTopic: video-processing
       Kafka__CompletedTopic: video-transcoding-completed
       ObjectStorage__Endpoint: minio:9000
-      ObjectStorage__PublicEndpoint: localhost:9000
+      ObjectStorage__PublicEndpoint: localhost:9443
       ObjectStorage__AccessKey: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
       ObjectStorage__SecretKey: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
       ObjectStorage__RenditionsBucket: streamforge-renditions
       ObjectStorage__UseSsl: "false"
-      ObjectStorage__PublicUseSsl: "false"
+      ObjectStorage__PublicUseSsl: "true"
       ObjectStorage__SignedUrlExpirySeconds: "3600"
     expose:
       - "8080"
@@ -163,10 +210,11 @@ services:
       Kafka__ConsumerGroupId: streamforge-playback-v1
       Kafka__CompletedTopic: video-transcoding-completed
       ObjectStorage__Endpoint: minio:9000
-      ObjectStorage__PublicEndpoint: localhost:9000
+      ObjectStorage__PublicEndpoint: localhost:9443
       ObjectStorage__AccessKey: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
       ObjectStorage__SecretKey: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
       ObjectStorage__RenditionsBucket: streamforge-renditions
+      ObjectStorage__PublicUseSsl: "true"
       Playback__SignedUrlExpirySeconds: "3600"
     expose: ["8080"]
     depends_on:
@@ -227,11 +275,10 @@ services:
     environment:
       MINIO_ROOT_USER: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
       MINIO_ROOT_PASSWORD: ${STREAMFORGE_MINIO_SECRET_KEY:?Copy .env.example to .env}
-      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:8080,http://localhost:4200
+      MINIO_API_CORS_ALLOW_ORIGIN: https://localhost:8443,https://localhost:4200
     expose:
       - "9000"
     ports:
-      - "9000:9000"
       - "9001:9001"
     volumes:
       - minio-data:/data
@@ -277,6 +324,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  gateway-keys:
   postgres-data:
   pgadmin-data:
   minio-data:

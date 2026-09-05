@@ -10,5 +10,6 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 COPY --from=build /app/publish ./
+RUN mkdir -p /home/app/.aspnet/DataProtection-Keys && chown -R $APP_UID /home/app/.aspnet
 USER $APP_UID
 ENTRYPOINT ["dotnet", "StreamForge.Gateway.Api.dll"]

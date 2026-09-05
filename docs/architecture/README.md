@@ -1,7 +1,7 @@
 # Architecture
 
 This service map describes the intended platform boundaries. The Gateway,
-Upload, Transcoding, and Feed boundaries and their asynchronous handoffs are
+Identity, Upload, Transcoding, Feed, and Playback boundaries and their asynchronous handoffs are
 implemented; the remaining boundaries are proposals and must stay empty until
 explicitly selected.
 
@@ -73,3 +73,8 @@ for rendition processing and outcome topics. See [ADR 0004](decisions/0004-feed-
 for the Feed projection and signed playback decision.
 See [ADR 0005](decisions/0005-adaptive-hls-playback.md) for adaptive HLS and the
 implemented Playback boundary.
+
+Authentication uses a separate Identity service, its PostgreSQL schema and a
+shared Redis instance. Gateway validates opaque cookies for uploads while feed
+and playback remain public. Nginx terminates HTTPS for app/API and signed media.
+See [ADR 0006](decisions/0006-session-authentication.md).

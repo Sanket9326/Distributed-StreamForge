@@ -88,8 +88,14 @@ public sealed class UploadApiFactory : IAsyncLifetime
     public IServiceProvider Services =>
         application?.Services ?? throw new InvalidOperationException("The test application is not running.");
 
-    public HttpClient CreateClient() =>
-        application?.CreateClient() ?? throw new InvalidOperationException("The test application is not running.");
+    public static readonly Guid OwnerId = Guid.Parse("e2c1bb10-4340-452f-9fc6-a68cf4b12457");
+
+    public HttpClient CreateClient()
+    {
+        var client = application?.CreateClient() ?? throw new InvalidOperationException("The test application is not running.");
+        client.DefaultRequestHeaders.Add("X-StreamForge-User-Id", OwnerId.ToString());
+        return client;
+    }
 
     public Task PauseKafkaAsync() => kafka.PauseAsync();
 

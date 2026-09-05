@@ -4,6 +4,41 @@
   min-height: 100dvh;
 }
 
+.account-link {
+  background: transparent;
+  border: 1px solid #555;
+  border-radius: 20px;
+  color: #79bdff;
+  padding: 8px 12px;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.account-name {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.auth-notice {
+  background: #30251b;
+  padding: 12px 20px;
+  color: #ffd8ab;
+  font-size: 14px;
+}
+.auth-notice button {
+  margin-left: 12px;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .register-link,
+  .account-name {
+    display: none;
+  }
+}
+
 .app-shell {
   min-height: 100vh;
   min-height: 100dvh;
@@ -16,7 +51,7 @@
   inset: 0 0 auto;
   height: 64px;
   display: grid;
-  grid-template-columns: 240px minmax(280px, 720px) 1fr;
+  grid-template-columns: 240px minmax(0, 1fr) auto;
   align-items: center;
   gap: 28px;
   padding: 0 24px;
@@ -376,7 +411,7 @@
 
 @media (max-width: 1100px) {
   .topbar {
-    grid-template-columns: 180px minmax(220px, 1fr) auto;
+    grid-template-columns: 180px minmax(0, 1fr) auto;
     gap: 16px;
   }
   .sidebar {
@@ -401,7 +436,7 @@
 
 @media (max-width: 820px) {
   .topbar {
-    grid-template-columns: 160px minmax(160px, 1fr) auto;
+    grid-template-columns: 160px minmax(0, 1fr) auto;
     gap: 12px;
     padding-inline: 16px;
   }

@@ -10,6 +10,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0003: Durable video transcoding](0003-durable-video-transcoding.md)
 - [0004: Event-built home feed and signed progressive playback](0004-feed-read-model-and-progressive-playback.md)
 - [0005: Adaptive HLS packaging and private direct delivery](0005-adaptive-hls-playback.md)
+- [0006: Identity-owned accounts and Redis browser sessions](0006-session-authentication.md)
 
 ```markdown
 # NNNN: Decision title

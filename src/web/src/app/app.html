@@ -26,7 +26,13 @@
       <button class="icon-button notification-button" type="button" aria-label="Notifications">
         <span aria-hidden="true">♢</span><i></i>
       </button>
-      <span class="profile-avatar" aria-label="Local profile">SF</span>
+      @if (auth.user(); as user) {
+        <span class="account-name" [title]="user.username">{{ user.username }}</span>
+        <button class="account-link" type="button" (click)="logout()">Log out</button>
+      } @else {
+        <a class="account-link" routerLink="/login">Log in</a>
+        <a class="account-link register-link" routerLink="/register">Sign up</a>
+      }
     </div>
   </header>
 
@@ -76,6 +82,11 @@
   </nav>
 
   <div class="page-content">
+    @if (auth.message()) {
+      <div class="auth-notice" role="alert">
+        {{ auth.message() }} <button type="button" (click)="auth.restore()">Retry</button>
+      </div>
+    }
     <router-outlet />
   </div>
 </div>

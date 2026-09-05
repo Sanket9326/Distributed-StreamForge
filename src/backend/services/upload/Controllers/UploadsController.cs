@@ -28,10 +28,17 @@ public sealed class UploadsController(IVideoIngestionService ingestionService) :
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<UploadResponse>> Upload(CancellationToken cancellationToken)
     {
+        if (!Guid.TryParse(Request.Headers["X-StreamForge-User-Id"], out var ownerId) || ownerId == Guid.Empty)
+            return Unauthorized(new ProblemDetails
+            {
+                Status = 401, Title = "An authenticated uploader is required.",
+                Extensions = { ["code"] = "session_invalid" }
+            });
         var response = await ingestionService.IngestAsync(
             Request.Body,
             Request.ContentType,
             HttpContext.TraceIdentifier,
+            ownerId,
             cancellationToken);
 
         return StatusCode(StatusCodes.Status201Created, response);

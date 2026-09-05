@@ -8,3 +8,8 @@ separate route and registers a browser-local completion notification over SSE.
 
 Use the repository [development setup](../../docs/development/setup.md) for the
 supported Node version and verified commands.
+
+Login and registration use secure HttpOnly session cookies with a fixed 24-hour
+lifetime. Upload navigation is guarded; feed and playback remain public. Run the
+local HTTPS certificate setup before npm start. Pending-upload notifications are
+scoped per user and close on logout. Forgot password is disabled for this release.

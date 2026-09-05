@@ -4,10 +4,14 @@ The Gateway is StreamForge's public HTTP boundary. The initial API is unversione
 while it remains a local MVP. Gateway and Upload communicate over HTTP and share
 no implementation assemblies.
 
+See [authentication contracts](authentication.md) for registration, login, logout,
+session cookies, antiforgery headers, rate limits, and authentication errors.
+
 ## Upload a video
 
 `POST /api/uploads`
 
+- Requires a live session cookie and X-XSRF-TOKEN header.
 - Content type: `multipart/form-data`
 - `title`: required string, trimmed, 1–200 characters
 - `description`: optional string, trimmed, at most 5,000 characters
@@ -21,17 +25,9 @@ Hashtags are trimmed, stripped of one leading `#`, lowercased, de-duplicated in
 submission order, and limited to 1–50 letters, numbers, underscores, or hyphens.
 The Web UI accepts comma-separated values and sends one `hashtags` part per value.
 
-Example through the public Web/Gateway endpoint:
-
-```powershell
-curl.exe `
-  -F "title=Example title" `
-  -F "description=Example description" `
-  -F "hashtags=dotnet" `
-  -F "hashtags=video" `
-  -F "file=@C:\path\source.mp4;type=video/mp4" `
-  http://localhost:8080/api/uploads
-```
+Use the signed-in Web upload page at `https://localhost:8443/upload`. Programmatic
+clients must retain the cookie jar and obtain an antiforgery token before posting;
+see the authentication contract. Anonymous upload requests now return 401.
 
 Successful response: `201 Created`
 
@@ -76,7 +72,7 @@ canonical video UUID as the Kafka key. The JSON payload uses camel case:
   "title": "Example title",
   "description": "Example description",
   "hashtags": ["dotnet", "video"],
-  "ownerId": null,
+  "ownerId": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
   "uploadedAtUtc": "2026-08-29T10:30:00Z",
   "correlationId": "43e738f2cbd446f093d5f64a5b01dc01"
 }
@@ -189,7 +185,7 @@ null `nextCursor` means there are no older ready videos.
           "audioCodec": "aac",
           "contentType": "video/mp4",
           "sizeBytes": 5242880,
-          "playbackUrl": "http://localhost:9000/streamforge-renditions/...?signed-query",
+          "playbackUrl": "https://localhost:9443/streamforge-renditions/...?signed-query",
           "playbackUrlExpiresAtUtc": "2026-08-31T11:35:00Z"
         }
       ]

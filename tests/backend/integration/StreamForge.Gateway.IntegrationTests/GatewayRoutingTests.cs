@@ -8,7 +8,7 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     [Fact]
     public async Task UploadRoute_ForwardsBodyAndGeneratedCorrelationId()
     {
-        using var client = factory.CreateClient();
+        using var client = await factory.AuthenticatedClientAsync();
         using var content = new ByteArrayContent([1, 2, 3, 4, 5]);
 
         using var response = await client.PostAsync("/api/uploads", content);
@@ -26,7 +26,7 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     [Fact]
     public async Task UploadRoute_PreservesCallerCorrelationId()
     {
-        using var client = factory.CreateClient();
+        using var client = await factory.AuthenticatedClientAsync();
         const string correlationId = "caller-correlation-id";
         client.DefaultRequestHeaders.Add("X-Correlation-ID", correlationId);
 
@@ -40,7 +40,7 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     [Fact]
     public async Task UploadRoute_PassesThroughDownstreamProblemDetails()
     {
-        using var client = factory.CreateClient();
+        using var client = await factory.AuthenticatedClientAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/uploads")
         {
             Content = new ByteArrayContent([1])
