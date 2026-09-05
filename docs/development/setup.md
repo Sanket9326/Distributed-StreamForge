@@ -29,6 +29,28 @@ npm run build
 npm test -- --watch=false
 ```
 
+## Authentication and HTTPS
+
+Identity is implemented as a separate service with an isolated identity schema.
+Gateway and Identity require ConnectionStrings__Redis; Identity also requires
+ConnectionStrings__IdentityDatabase. Redis connection strings should include
+abortConnect=false,connectTimeout=2000,asyncTimeout=2000. Supply credentials
+through environment variables, never committed configuration. Set
+STREAMFORGE_REDIS_PASSWORD in .env for Compose.
+
+Before npm start, run ./infra/docker/setup-local-https.ps1 -Trust from the root.
+The app uses HTTPS cookies in both local workflows. Feed and Playback must sign
+URLs for localhost:9443 with PublicUseSsl=true when using the Compose media edge.
+Private backend service calls remain HTTP. See the
+[authentication runbook](../operations/runbooks/authentication.md) for certificate,
+Redis, proxy trust, Data Protection, failure recovery, and production assumptions.
+
+Identity can be run directly after supplying its database/Redis configuration:
+
+```powershell
+dotnet run --project src/backend/services/identity/StreamForge.Identity.Api.csproj
+```
+
 ## Run services locally
 
 Start each command in its own terminal from the repository root. Before starting
@@ -68,25 +90,26 @@ Set-Location src/web
 npm start
 ```
 
-Open `http://localhost:4200`. The Angular development proxy sends `/api` requests
-to the Gateway on port 5080; the Gateway sends upload requests to Upload on port
+Open `https://localhost:4200`. The Angular development proxy sends `/api` requests
+to the Gateway on port 5080; Identity listens on port 5084; the Gateway sends upload requests to Upload on port
 5081 and feed requests to Feed on port 5082.
 
 ## Run with Docker
 
 ```powershell
 Copy-Item .env.example .env
+./infra/docker/setup-local-https.ps1 -Trust
 # Replace every placeholder in .env before continuing.
-docker compose -f infra/docker/compose.yml up --build
-docker compose -f infra/docker/compose.yml ps
+docker compose --env-file .env -f infra/docker/compose.yml up --build
+docker compose --env-file .env -f infra/docker/compose.yml ps
 ```
 
 Open the local interfaces:
 
 | Interface | URL | Login |
 | --- | --- | --- |
-| StreamForge | `http://localhost:8080` | None |
-| MinIO signed media API | `http://localhost:9000` | Signed playback URLs only |
+| StreamForge | `https://localhost:8443` | Public browsing; register to upload |
+| MinIO signed media API | `https://localhost:9443` | Signed playback URLs only |
 | pgAdmin | `http://localhost:5050` | Email from `STREAMFORGE_PGADMIN_EMAIL`; password from `STREAMFORGE_POSTGRES_PASSWORD` |
 | MinIO Console | `http://localhost:9001` | Access key and secret key from `.env` |
 
@@ -103,8 +126,8 @@ To view Upload metadata in pgAdmin, choose **Add New Server** and use:
 
 Use `postgres`, not `localhost`, because pgAdmin runs inside the Compose network.
 The Gateway, Upload service, Transcoding worker, Feed service, database port,
-and Kafka remain private. The Web UI, administration consoles, and MinIO media
-API publish host ports; the rendition bucket remains private and requires signed URLs. Upload
+Identity, Redis, and Kafka remain private. The Web UI, administration consoles,
+and HTTPS media edge publish host ports; the rendition bucket remains private and requires signed URLs. Upload
 applies committed EF Core migrations, creates the private MinIO bucket if absent,
 and creates `video-processing` only if absent before becoming ready.
 Transcoding then creates `streamforge-renditions` and its completed, failed, and
@@ -115,7 +138,7 @@ earliest offset for its new consumer group.
 Stop containers while preserving objects, database rows, and Kafka logs:
 
 ```powershell
-docker compose -f infra/docker/compose.yml down
+docker compose --env-file .env -f infra/docker/compose.yml down
 ```
 
 Compose sets Kafka's `log.dirs` to the mounted `kafka-data` volume. Keep that
@@ -126,7 +149,7 @@ To permanently delete all local MinIO, PostgreSQL, Kafka, and pgAdmin data,
 explicitly include `--volumes`. This cannot be undone:
 
 ```powershell
-docker compose -f infra/docker/compose.yml down --volumes
+docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 ```
 
 ## Configuration
@@ -174,7 +197,7 @@ docker compose -f infra/docker/compose.yml down --volumes
 | Transcoding | `Transcoding:HlsSegmentDurationSeconds` / `AssetUploadConcurrency` | `4` / `4` |
 
 Compose restricts MinIO's cluster-wide CORS origins to
-`http://localhost:8080` and `http://localhost:4200` through
+`https://localhost:8443` and `https://localhost:4200` through
 `MINIO_API_CORS_ALLOW_ORIGIN`; the rendition bucket remains private. Community
 MinIO enables CORS for supported HTTP methods but does not implement the
 per-bucket `PutBucketCors` API.
@@ -182,3 +205,18 @@ per-bucket `PutBucketCors` API.
 Use double underscores for environment-variable configuration segments. Do not
 commit `.env`, secrets, local paths, or uploaded media. `.env.example` contains
 placeholders only.
+
+## Browser authentication and playback tests
+
+With the HTTPS Compose topology running, from src/web:
+
+```powershell
+$env:STREAMFORGE_E2E = "1"
+npm run test:e2e
+```
+
+The authentication tests cover secure cookies, persistent sessions, logout, guards,
+and login/registration screenshots. HLS playback tests generate synthetic media
+with host FFmpeg or the built Transcoding image, register a disposable test account, upload, and exercise adaptive
+playback. Test accounts and videos remain in local volumes. Screenshots are
+written under artifacts/screenshots; test output and generated media are ignored.

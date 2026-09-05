@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { UploadReceipt } from '../upload.service';
 import { UploadPage } from './upload.page';
+import { AuthService } from '../auth/auth.service';
 
 describe('UploadPage', () => {
   let fixture: ComponentFixture<UploadPage>;
@@ -15,6 +16,11 @@ describe('UploadPage', () => {
       providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
     fixture = TestBed.createComponent(UploadPage);
+    TestBed.inject(AuthService).user.set({
+      id: 'test-user',
+      username: 'tester',
+      email: 'tester@example.test',
+    });
     http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
   });
@@ -56,7 +62,7 @@ describe('UploadPage', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Video stored and queued');
-    expect(localStorage.getItem('streamforge.pending-uploads.v1')).toContain(receipt.id);
+    expect(localStorage.getItem('streamforge.pending-uploads.v2.test-user')).toContain(receipt.id);
   });
 
   it('rejects unsupported files before upload', () => {

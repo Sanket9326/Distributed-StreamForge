@@ -13,11 +13,13 @@ public interface IVideoIngestionService
     /// <param name="requestBody">The unbuffered multipart request stream.</param>
     /// <param name="requestContentType">The multipart content type, including its boundary.</param>
     /// <param name="correlationId">The validated request correlation ID.</param>
+    /// <param name="ownerId">The verified account that owns the new video.</param>
     /// <param name="cancellationToken">Signals that request processing should stop.</param>
     /// <returns>The receipt for the durably stored, queued video.</returns>
     Task<UploadResponse> IngestAsync(
         Stream requestBody,
         string? requestContentType,
         string correlationId,
+        Guid ownerId,
         CancellationToken cancellationToken);
 }

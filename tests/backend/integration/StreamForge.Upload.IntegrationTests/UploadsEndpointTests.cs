@@ -56,6 +56,7 @@ public sealed class UploadsEndpointTests(UploadApiFactory factory) : IClassFixtu
         Assert.Equal(correlationId, receipt.CorrelationId);
 
         var video = await GetVideoAsync(receipt.Id);
+        Assert.Equal(UploadApiFactory.OwnerId, video.OwnerId);
         Assert.Equal("streamforge-videos", video.StorageBucket);
         Assert.Matches(
             $"^sources/[0-9]{{4}}/[0-9]{{2}}/[0-9]{{2}}/[0-9]{{8}}T[0-9]{{9}}Z-{receipt.Id:N}\\.mp4$",
@@ -67,7 +68,7 @@ public sealed class UploadsEndpointTests(UploadApiFactory factory) : IClassFixtu
         Assert.Equal(receipt.Id.ToString("D"), objectStat.MetaData["video-id"]);
         Assert.Equal(correlationId, objectStat.MetaData["correlation-id"]);
         Assert.Equal("source.mp4", objectStat.MetaData["original-file-name"]);
-        Assert.DoesNotContain("owner-id", objectStat.MetaData.Keys);
+        Assert.Equal(UploadApiFactory.OwnerId.ToString("D"), objectStat.MetaData["owner-id"]);
         Assert.DoesNotContain("title", objectStat.MetaData.Keys);
 
         await WaitForOutboxProcessedAsync(receipt.Id, TimeSpan.FromSeconds(15));
@@ -77,7 +78,7 @@ public sealed class UploadsEndpointTests(UploadApiFactory factory) : IClassFixtu
         Assert.Equal(receipt.Id, videoUploaded.VideoId);
         Assert.Equal(video.StorageObjectKey, videoUploaded.ObjectKey);
         Assert.Equal(["dotnet", "video"], videoUploaded.Hashtags);
-        Assert.Null(videoUploaded.OwnerId);
+        Assert.Equal(UploadApiFactory.OwnerId, videoUploaded.OwnerId);
         Assert.Equal(correlationId, videoUploaded.CorrelationId);
 
         await AssertOutboxProcessedAsync(videoUploaded.EventId);

@@ -26,6 +26,8 @@ Thumbs.db
 # Generated media and infrastructure state
 artifacts/
 data/
+!src/backend/services/identity/Data/
+!src/backend/services/identity/Data/**
 media/
 !src/backend/workers/transcoding/Media/
 !src/backend/workers/transcoding/Media/**
@@ -34,3 +36,9 @@ media/
 *.mov
 *.m3u8
 *.key
+
+# Local TLS certificates and browser test output
+.certs/
+test-results/
+playwright-report/
+tests/web/e2e/.generated/

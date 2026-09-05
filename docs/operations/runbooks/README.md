@@ -125,7 +125,7 @@ logs, doing so would cause already processed events to be replayed.
 
 ## A signed video does not play
 
-Confirm the browser can reach `http://localhost:9000` and that the Feed response
+Confirm the browser can reach `https://localhost:9443` and that the Feed response
 contains a non-expired `playbackUrl`. Do not make `streamforge-renditions`
 public. Feed signs URLs using the browser-visible endpoint but verifies storage
 through the private `minio:9000` endpoint. The Web client refreshes an expiring
@@ -141,3 +141,6 @@ lag or temporarily unavailable storage. If signed segment requests fail, verify
 the MinIO container has `MINIO_API_CORS_ALLOW_ORIGIN` set to the Web origin and
 inspect the browser's preflight response. The Web client reloads the stable
 manifest once for fresh signatures and then falls back to a Feed-signed MP4.
+
+See [authentication operations](authentication.md) for HTTPS certificates, sessions,
+Redis outages, rate limits, proxy trust and Gateway key persistence.

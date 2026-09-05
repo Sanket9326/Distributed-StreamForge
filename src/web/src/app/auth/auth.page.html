@@ -1,0 +1,102 @@
+<section class="auth-layout">
+  <div class="auth-intro">
+    <span class="eyebrow">YOUR NEXT GREAT VIDEO STARTS HERE</span>
+    <h1>{{ registering ? 'Create your account.' : 'Welcome back.' }}</h1>
+    <p>
+      {{
+        registering
+          ? 'Join StreamForge and share what you create.'
+          : 'Log in to upload your next video and keep creating.'
+      }}
+    </p>
+    <a routerLink="/" class="browse-link">← Keep exploring videos</a>
+  </div>
+  <div class="auth-card">
+    <h2>{{ registering ? 'Join StreamForge' : 'Log in to StreamForge' }}</h2>
+    <p class="subtitle">
+      {{
+        registering
+          ? 'A place for your ideas, stories, and videos.'
+          : 'Pick up where your creativity left off.'
+      }}
+    </p>
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate [attr.aria-busy]="busy()">
+      @if (registering) {
+        <label for="username">Username</label>
+        <input
+          id="username"
+          formControlName="username"
+          autocomplete="username"
+          maxlength="50"
+          aria-describedby="username-help"
+          [attr.aria-invalid]="form.controls.username.touched && form.controls.username.invalid"
+        />
+        <small id="username-help">3–50 letters, numbers, dots, underscores, or hyphens.</small>
+      }
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        autocomplete="email"
+        maxlength="254"
+        [attr.aria-invalid]="form.controls.email.touched && form.controls.email.invalid"
+      />
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <small class="field-error">Enter a valid email address.</small>
+      }
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        [attr.autocomplete]="registering ? 'new-password' : 'current-password'"
+        maxlength="128"
+        aria-describedby="password-help"
+        [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid"
+      />
+      <small id="password-help">15–128 characters. Spaces are welcome.</small>
+      @if (registering) {
+        <label for="confirm-password">Confirm password</label>
+        <input
+          id="confirm-password"
+          type="password"
+          formControlName="confirmPassword"
+          autocomplete="new-password"
+          maxlength="128"
+        />
+        <div class="optional-fields">
+          <label for="dob">Date of birth <span>(optional)</span></label>
+          <input id="dob" type="date" formControlName="dob" autocomplete="bday" [max]="today" />
+          <label for="address">Address <span>(optional)</span></label>
+          <textarea
+            id="address"
+            formControlName="address"
+            autocomplete="street-address"
+            rows="2"
+            maxlength="1000"
+          ></textarea>
+        </div>
+      } @else {
+        <div class="forgot">
+          <button type="button" disabled aria-describedby="forgot-help">Forgot password?</button
+          ><small id="forgot-help">Coming soon</small>
+        </div>
+      }
+      @if (error()) {
+        <p class="form-error" role="alert">{{ error() }}</p>
+      }
+      <button class="submit" type="submit" [disabled]="busy()">
+        {{ busy() ? 'Please wait…' : registering ? 'Create account' : 'Log in' }}
+      </button>
+    </form>
+    <p class="switch-form">
+      {{ registering ? 'Already have an account?' : 'New to StreamForge?' }}
+      <a
+        [routerLink]="registering ? '/login' : '/register'"
+        [queryParams]="{ returnUrl: returnUrl }"
+        >{{ registering ? 'Log in' : 'Create an account' }}</a
+      >
+    </p>
+  </div>
+</section>

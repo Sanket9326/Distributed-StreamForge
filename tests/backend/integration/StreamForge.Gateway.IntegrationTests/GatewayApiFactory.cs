@@ -7,11 +7,29 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using StreamForge.Gateway.Api.Authentication;
+using StackExchange.Redis;
 
 namespace StreamForge.Gateway.IntegrationTests;
 
 public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public const string ValidSession = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    public static readonly Guid UserId = Guid.Parse("e2c1bb10-4340-452f-9fc6-a68cf4b12457");
+
+    public async Task<HttpClient> AuthenticatedClientAsync()
+    {
+        var client = CreateClient(new() { BaseAddress = new Uri("https://localhost"), HandleCookies = false });
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/csrf");
+        request.Headers.Add("Cookie", $"{RedisSessionReader.CookieName}={ValidSession}");
+        using var response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var cookies = response.Headers.GetValues("Set-Cookie").Select(x => x.Split(';')[0]).ToArray();
+        client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", cookies.Append($"{RedisSessionReader.CookieName}={ValidSession}")));
+        client.DefaultRequestHeaders.Add("X-XSRF-TOKEN", Uri.UnescapeDataString(cookies.Single(x => x.StartsWith("XSRF-TOKEN=")).Split('=', 2)[1]));
+        return client;
+    }
     private WebApplication? downstream;
     private string? downstreamAddress;
 
@@ -40,6 +58,8 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             await Results.Json(new
             {
                 receivedBytes = body.Length,
+                ownerId = context.Request.Headers["X-StreamForge-User-Id"].ToString(),
+                cookie = context.Request.Headers.Cookie.ToString(),
                 correlationId = context.Request.Headers["X-Correlation-ID"].ToString()
             }).ExecuteAsync(context);
         });
@@ -68,7 +88,7 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
 
         await downstream.StartAsync();
         downstreamAddress = downstream.Services
-            .GetRequiredService<IServer>()
+            .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
             .Features
             .Get<IServerAddressesFeature>()!
             .Addresses
@@ -104,5 +124,20 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
                     $"{downstreamAddress}/"
             });
         });
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<ISessionReader>();
+            services.AddSingleton<ISessionReader, TestSessionReader>();
+        });
+    }
+
+    private sealed class TestSessionReader : ISessionReader
+    {
+        public Task<SessionRecord?> ReadAsync(string? id, CancellationToken cancellationToken)
+        {
+            if (id == "redis-down") throw new RedisConnectionException(ConnectionFailureType.UnableToConnect, "Test outage");
+            return Task.FromResult(id == ValidSession
+                ? new SessionRecord(UserId, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(24)) : null);
+        }
     }
 }

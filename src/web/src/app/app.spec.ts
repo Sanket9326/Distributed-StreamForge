@@ -19,6 +19,7 @@ describe('App shell', () => {
     const router = TestBed.inject(Router);
 
     fixture.detectChanges();
+    http.expectOne('/api/auth/me').flush({}, { status: 401, statusText: 'Unauthorized' });
     await router.navigateByUrl('/');
     fixture.detectChanges();
 

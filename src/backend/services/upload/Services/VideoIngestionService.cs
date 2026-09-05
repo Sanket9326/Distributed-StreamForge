@@ -35,6 +35,7 @@ public sealed class VideoIngestionService(
         Stream requestBody,
         string? requestContentType,
         string correlationId,
+        Guid ownerId,
         CancellationToken cancellationToken)
     {
         var videoId = Guid.NewGuid();
@@ -110,7 +111,7 @@ public sealed class VideoIngestionService(
                             fileContentType!,
                             uploadedAtUtc,
                             correlationId,
-                            OwnerId: null,
+                            OwnerId: ownerId,
                             limitedStream),
                         cancellationToken);
                     objectStored = true;
@@ -171,7 +172,7 @@ public sealed class VideoIngestionService(
                 Title = metadata.Title,
                 Description = metadata.Description,
                 Hashtags = [.. metadata.Hashtags],
-                OwnerId = null,
+                OwnerId = ownerId,
                 OriginalFileName = originalFileName,
                 ContentType = fileContentType,
                 SizeBytes = sizeBytes,
@@ -197,7 +198,7 @@ public sealed class VideoIngestionService(
                 metadata.Title,
                 metadata.Description,
                 metadata.Hashtags,
-                OwnerId: null,
+                OwnerId: ownerId,
                 uploadedAtUtc,
                 correlationId);
 

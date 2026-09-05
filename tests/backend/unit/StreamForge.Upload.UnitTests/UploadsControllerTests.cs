@@ -9,6 +9,14 @@ namespace StreamForge.Upload.UnitTests;
 public sealed class UploadsControllerTests
 {
     [Fact]
+    public async Task Upload_WithoutGatewayIdentity_RejectsWithoutReadingBody()
+    {
+        var controller = new UploadsController(null!)
+        { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        var result = await controller.Upload(CancellationToken.None);
+        Assert.IsType<UnauthorizedObjectResult>(result.Result);
+    }
+    [Fact]
     public async Task Upload_ForwardsHttpRequestToIngestionServiceAndReturnsCreated()
     {
         var receipt = new UploadResponse(
@@ -28,6 +36,7 @@ public sealed class UploadsControllerTests
         {
             TraceIdentifier = "correlation-123"
         };
+        httpContext.Request.Headers["X-StreamForge-User-Id"] = Guid.NewGuid().ToString();
         httpContext.Request.Body = requestBody;
         httpContext.Request.ContentType = "multipart/form-data; boundary=test";
         var controller = new UploadsController(ingestionService)
@@ -43,6 +52,7 @@ public sealed class UploadsControllerTests
         Assert.Same(requestBody, ingestionService.RequestBody);
         Assert.Equal(httpContext.Request.ContentType, ingestionService.RequestContentType);
         Assert.Equal(httpContext.TraceIdentifier, ingestionService.CorrelationId);
+        Assert.Equal(Guid.Parse(httpContext.Request.Headers["X-StreamForge-User-Id"]!), ingestionService.OwnerId);
     }
 
     private sealed class RecordingIngestionService(UploadResponse response) : IVideoIngestionService
@@ -52,16 +62,19 @@ public sealed class UploadsControllerTests
         public string? RequestContentType { get; private set; }
 
         public string? CorrelationId { get; private set; }
+        public Guid OwnerId { get; private set; }
 
         public Task<UploadResponse> IngestAsync(
             Stream requestBody,
             string? requestContentType,
             string correlationId,
+        Guid ownerId,
             CancellationToken cancellationToken)
         {
             RequestBody = requestBody;
             RequestContentType = requestContentType;
             CorrelationId = correlationId;
+            OwnerId = ownerId;
             return Task.FromResult(response);
         }
     }
