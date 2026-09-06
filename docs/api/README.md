@@ -6,6 +6,8 @@ no implementation assemblies.
 
 See [authentication contracts](authentication.md) for registration, login, logout,
 session cookies, antiforgery headers, rate limits, and authentication errors.
+See [engagement contracts](engagement.md) for reactions, qualified views, comments,
+public profiles, and stable watch-page video lookup.
 
 ## Upload a video
 
@@ -170,6 +172,7 @@ null `nextCursor` means there are no older ready videos.
   "items": [
     {
       "id": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
+      "ownerId": "e2c1bb10-4340-452f-9fc6-a68cf4b12457",
       "title": "Example title",
       "description": "Example description",
       "hashtags": ["dotnet", "video"],
@@ -199,6 +202,8 @@ Feed returns every completed rendition but no raw source coordinates. Playback
 URLs expire after one hour and read directly from the private S3-compatible
 bucket. The Web client selects the greatest height and width. If a URL is near
 expiry, `GET /api/feed/videos/{videoId}/renditions` returns a fresh signed set.
+`GET /api/feed/videos/{videoId}` returns the same shape for one ready video with
+fresh signed URLs and is used for direct `/watch/{videoId}` visits.
 
 `GET /api/feed/videos/{videoId}/completion-events` is a server-sent event stream.
 It emits one `completed` event and closes when that video is complete. If the
@@ -222,6 +227,7 @@ JSON success response and Problem Details body also contain that identifier.
 - Upload service: `GET /health`, covering PostgreSQL, MinIO, Kafka, and outbox age
 - Transcoding worker: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Feed service: `GET /health/live`, `GET /health/ready`, and `GET /health`
+- Engagement service: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Web container: `GET /health`
 
 Gateway and Upload health endpoints are internal-only in the Compose topology.

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using StreamForge.Gateway.Api.Authentication;
 using StackExchange.Redis;
 
@@ -19,14 +20,23 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
     public static readonly Guid UserId = Guid.Parse("e2c1bb10-4340-452f-9fc6-a68cf4b12457");
 
     public async Task<HttpClient> AuthenticatedClientAsync()
+        => await ClientWithAntiforgeryAsync(ValidSession);
+
+    public async Task<HttpClient> AnonymousClientAsync()
+        => await ClientWithAntiforgeryAsync(null);
+
+    private async Task<HttpClient> ClientWithAntiforgeryAsync(string? session)
     {
         var client = CreateClient(new() { BaseAddress = new Uri("https://localhost"), HandleCookies = false });
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/csrf");
-        request.Headers.Add("Cookie", $"{RedisSessionReader.CookieName}={ValidSession}");
+        if (session is not null)
+            request.Headers.Add("Cookie", $"{RedisSessionReader.CookieName}={session}");
         using var response = await client.SendAsync(request);
         response.EnsureSuccessStatusCode();
         var cookies = response.Headers.GetValues("Set-Cookie").Select(x => x.Split(';')[0]).ToArray();
-        client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", cookies.Append($"{RedisSessionReader.CookieName}={ValidSession}")));
+        client.DefaultRequestHeaders.Add("Cookie", string.Join("; ", session is null
+            ? cookies
+            : cookies.Append($"{RedisSessionReader.CookieName}={session}")));
         client.DefaultRequestHeaders.Add("X-XSRF-TOKEN", Uri.UnescapeDataString(cookies.Single(x => x.StartsWith("XSRF-TOKEN=")).Split('=', 2)[1]));
         return client;
     }
@@ -36,6 +46,7 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
     public async Task InitializeAsync()
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Logging.ClearProviders();
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
         downstream = builder.Build();
 
@@ -86,6 +97,23 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             await context.Response.WriteAsync("#EXTM3U\n");
         });
 
+        downstream.MapMethods("/api/engagement/{**remainder}",
+            [HttpMethods.Get, HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete],
+            async context =>
+            {
+                await Results.Json(new
+                {
+                    method = context.Request.Method,
+                    userId = context.Request.Headers["X-StreamForge-User-Id"].ToString(),
+                    cookie = context.Request.Headers.Cookie.ToString()
+                }).ExecuteAsync(context);
+            });
+
+        downstream.MapGet("/api/users", async context =>
+        {
+            await Results.Json(Array.Empty<object>()).ExecuteAsync(context);
+        });
+
         await downstream.StartAsync();
         downstreamAddress = downstream.Services
             .GetRequiredService<Microsoft.AspNetCore.Hosting.Server.IServer>()
@@ -112,6 +140,7 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             throw new InvalidOperationException("The downstream test server must be started first.");
         }
 
+        builder.ConfigureLogging(logging => logging.ClearProviders());
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -121,6 +150,10 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address"] =
                     $"{downstreamAddress}/",
                 ["ReverseProxy:Clusters:playback-cluster:Destinations:playback-service:Address"] =
+                    $"{downstreamAddress}/",
+                ["ReverseProxy:Clusters:identity-cluster:Destinations:identity-service:Address"] =
+                    $"{downstreamAddress}/",
+                ["ReverseProxy:Clusters:engagement-cluster:Destinations:engagement-service:Address"] =
                     $"{downstreamAddress}/"
             });
         });

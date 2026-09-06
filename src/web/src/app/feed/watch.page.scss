@@ -1,0 +1,17 @@
+@use './home-feed.page.scss';
+
+.watch-state {
+  min-height: 45vh;
+  display: grid;
+  place-items: center;
+  color: #aaa;
+}
+
+.watch-state.error {
+  color: #ffb4b4;
+}
+
+.rail-chips button:disabled {
+  cursor: not-allowed;
+  opacity: 0.85;
+}

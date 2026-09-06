@@ -65,4 +65,43 @@ public sealed class SessionGatewayTests(GatewayApiFactory factory) : IClassFixtu
         using var response = await client.PostAsJsonAsync(path, new { });
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task EngagementReaction_RequiresSessionAndForwardsOnlyVerifiedIdentity()
+    {
+        var path = $"/api/engagement/videos/{Guid.NewGuid():D}/reaction";
+        using var anonymous = await factory.AnonymousClientAsync();
+        using var rejected = await anonymous.PutAsJsonAsync(path, new { reaction = "like" });
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+
+        using var authenticated = await factory.AuthenticatedClientAsync();
+        authenticated.DefaultRequestHeaders.Add("X-StreamForge-User-Id", Guid.NewGuid().ToString());
+        using var accepted = await authenticated.PutAsJsonAsync(path, new { reaction = "like" });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        var body = await accepted.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal(GatewayApiFactory.UserId.ToString(), body.GetProperty("userId").GetString());
+        Assert.Equal(string.Empty, body.GetProperty("cookie").GetString());
+    }
+
+    [Fact]
+    public async Task EngagementView_IsPublicButStillRequiresAntiforgery()
+    {
+        var path = $"/api/engagement/videos/{Guid.NewGuid():D}/views";
+        using var missingToken = factory.CreateClient();
+        using var rejected = await missingToken.PostAsJsonAsync(path, new { viewSessionId = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.Forbidden, rejected.StatusCode);
+
+        using var anonymous = await factory.AnonymousClientAsync();
+        using var accepted = await anonymous.PostAsJsonAsync(path, new { viewSessionId = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+    }
+
+    [Fact]
+    public async Task EngagementCommentMutations_RequireSession()
+    {
+        using var anonymous = await factory.AnonymousClientAsync();
+        using var response = await anonymous.PostAsJsonAsync(
+            $"/api/engagement/videos/{Guid.NewGuid():D}/comments", new { body = "hello" });
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }

@@ -36,6 +36,7 @@ services:
       ReverseProxy__Clusters__upload-cluster__Destinations__upload-service__Address: http://upload-service:8080/
       ReverseProxy__Clusters__feed-cluster__Destinations__feed-service__Address: http://feed-service:8080/
       ReverseProxy__Clusters__playback-cluster__Destinations__playback-service__Address: http://playback-service:8080/
+      ReverseProxy__Clusters__engagement-cluster__Destinations__engagement-service__Address: http://engagement-service:8080/
     expose:
       - "8080"
     depends_on:
@@ -44,6 +45,8 @@ services:
       feed-service:
         condition: service_healthy
       playback-service:
+        condition: service_healthy
+      engagement-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
@@ -189,6 +192,44 @@ services:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  engagement-service:
+    build:
+      context: ../../src/backend/services/engagement
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__EngagementDatabase: Host=postgres;Port=5432;Database=${STREAMFORGE_POSTGRES_DATABASE:?Copy .env.example to .env};Username=${STREAMFORGE_POSTGRES_USER:?Copy .env.example to .env};Password=${STREAMFORGE_POSTGRES_PASSWORD:?Copy .env.example to .env}
+      ConnectionStrings__Redis: redis:6379,password=${STREAMFORGE_REDIS_PASSWORD:?Set Redis password},abortConnect=false,connectTimeout=2000,asyncTimeout=2000
+      Feed__BaseUrl: http://feed-service:8080
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__ReactionTopic: video-engagement-reactions
+      Kafka__ViewTopic: video-engagement-views
+      Kafka__CompletedTopic: video-transcoding-completed
+      Kafka__ReactionConsumerGroupId: streamforge-engagement-reactions-v1
+      Kafka__ViewConsumerGroupId: streamforge-engagement-views-v1
+      Kafka__CatalogConsumerGroupId: streamforge-engagement-catalog-v1
+      Kafka__PartitionCount: "1"
+      Kafka__ReplicationFactor: "1"
+      Engagement__ViewAggregationWindowSeconds: "300"
+      Engagement__MaximumViewBatchSize: "10000"
+      Engagement__ViewSessionTtlHours: "24"
+    expose: ["8080"]
+    depends_on:
+      feed-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       kafka:
         condition: service_healthy

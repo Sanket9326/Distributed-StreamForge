@@ -1,7 +1,9 @@
 # StreamForge
 
 StreamForge is a learning-focused distributed video platform built with .NET
-microservices and an Angular web client.
+microservices and an Angular web client. Its stable watch pages now include
+durable comments, mutually exclusive reactions, qualified view counts, public
+creator names, and stable-link sharing.
 
 ## Implemented slice
 
@@ -23,6 +25,13 @@ Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service
                                                                   v
                                                     .NET Feed API -> PostgreSQL read model
                                                                   -> signed rendition URLs
+                                                                  |
+                                                                  v
+                                                 Angular /watch/:videoId
+                                                                  |
+                                             .NET Engagement API -> PostgreSQL
+                                                |                 -> Kafka consumers
+                                                `-> Redis visible projections
 ```
 
 The Upload service streams MP4, MOV, WebM, and MKV files up to 1 GB directly to

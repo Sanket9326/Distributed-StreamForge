@@ -21,6 +21,18 @@ public sealed class FeedController(
         CancellationToken cancellationToken = default) =>
         feedQuery.GetPageAsync(limit, cursor, cancellationToken);
 
+    [HttpGet("{videoId:guid}")]
+    [ProducesResponseType<FeedVideoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public Task<FeedVideoResponse> GetVideo(Guid videoId, CancellationToken cancellationToken) =>
+        feedQuery.GetVideoAsync(videoId, cancellationToken);
+
+    [HttpHead("{videoId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> HeadVideo(Guid videoId, CancellationToken cancellationToken) =>
+        await feedQuery.IsVideoAvailableAsync(videoId, cancellationToken) ? Ok() : NotFound();
+
     [HttpGet("{videoId:guid}/renditions")]
     [ProducesResponseType<IReadOnlyList<FeedRenditionResponse>>(StatusCodes.Status200OK)]
     public Task<IReadOnlyList<FeedRenditionResponse>> GetRenditions(

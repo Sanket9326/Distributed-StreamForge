@@ -34,10 +34,19 @@ describe('App shell', () => {
     ) as HTMLAnchorElement[];
     expect(links.map((link) => link.getAttribute('aria-label'))).toEqual([
       'Home',
-      'Explore',
       'Upload',
     ]);
     expect(fixture.nativeElement.textContent).toContain('No videos are ready yet');
+
+    const menu = fixture.nativeElement.querySelector(
+      'button[aria-label="Collapse navigation"]',
+    ) as HTMLButtonElement;
+    menu.click();
+    fixture.detectChanges();
+    expect(localStorage.getItem('streamforge-sidebar-collapsed')).toBe('1');
+    expect(fixture.nativeElement.querySelector('.app-shell').classList).toContain(
+      'sidebar-collapsed',
+    );
     http.verify();
   });
 });

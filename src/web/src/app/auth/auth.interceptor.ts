@@ -11,7 +11,8 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   return next(request).pipe(
     catchError((error: unknown) => {
       if (
-        /^\/api\/uploads(?:\/|\?|$)/.test(request.url) &&
+        (/^\/api\/uploads(?:\/|\?|$)/.test(request.url) ||
+          /^\/api\/engagement\//.test(request.url)) &&
         error instanceof HttpErrorResponse &&
         error.status === 401
       ) {

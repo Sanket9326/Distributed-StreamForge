@@ -14,6 +14,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FeedService, FeedVideo } from './feed.service';
 import { VideoCardComponent } from './video-card.component';
+import { Router } from '@angular/router';
+import { EngagementService, VideoSummary } from '../engagement/engagement.service';
+import { ProfileService } from '../profiles/profile.service';
 
 @Component({
   selector: 'app-home-feed-page',
@@ -34,11 +37,8 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   protected readonly errorMessage = signal('');
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly hasMore = computed(() => this.nextCursor() !== null);
-  protected readonly selectedVideo = signal<FeedVideo | null>(null);
-  protected readonly recommendations = computed(() => {
-    const selected = this.selectedVideo();
-    return selected ? this.videos().filter((video) => video.id !== selected.id) : [];
-  });
+  protected readonly summaries = signal(new Map<string, VideoSummary>());
+  protected readonly creatorNames = signal(new Map<string, string>());
   protected readonly categories = [
     'All',
     'Recently uploaded',
@@ -49,6 +49,9 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   ];
 
   private readonly feedService = inject(FeedService);
+  private readonly engagement = inject(EngagementService);
+  private readonly profiles = inject(ProfileService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private sentinel?: ElementRef<HTMLElement>;
   private intersectionObserver?: IntersectionObserver;
@@ -107,15 +110,7 @@ export class HomeFeedPage implements OnInit, OnDestroy {
   protected openWatch(video: FeedVideo): void {
     this.activePlayer?.pause();
     this.activePlayer = undefined;
-    this.selectedVideo.set(video);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  protected closeWatch(): void {
-    this.activePlayer?.pause();
-    this.activePlayer = undefined;
-    this.selectedVideo.set(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    void this.router.navigate(['/watch', video.id]);
   }
 
   private tryLoadMore(): void {
@@ -144,7 +139,9 @@ export class HomeFeedPage implements OnInit, OnDestroy {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (page) => {
-          this.videos.set(append ? [...this.videos(), ...page.items] : page.items);
+          const videos = append ? [...this.videos(), ...page.items] : page.items;
+          this.videos.set(videos);
+          void this.enrich(videos);
           this.nextCursor.set(page.nextCursor);
           this.initialLoading.set(false);
           this.loadingMore.set(false);
@@ -158,5 +155,26 @@ export class HomeFeedPage implements OnInit, OnDestroy {
           this.loadingMore.set(false);
         },
       });
+  }
+
+  protected summaryFor(videoId: string): VideoSummary | null {
+    return this.summaries().get(videoId) ?? null;
+  }
+
+  protected creatorFor(video: FeedVideo): string {
+    return (video.ownerId && this.creatorNames().get(video.ownerId)) || 'StreamForge Creator';
+  }
+
+  private async enrich(videos: FeedVideo[]): Promise<void> {
+    try {
+      const [summaries, names] = await Promise.all([
+        this.engagement.getSummaries(videos.map((video) => video.id)),
+        this.profiles.resolve(videos.map((video) => video.ownerId)),
+      ]);
+      this.summaries.set(new Map(summaries.map((summary) => [summary.videoId, summary])));
+      this.creatorNames.set(names);
+    } catch {
+      // Feed browsing remains available while optional engagement/profile data recovers.
+    }
   }
 }

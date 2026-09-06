@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/backend/services/identity/StreamForge.Identity.Api.csproj" />
+    <Project Path="src/backend/services/engagement/StreamForge.Engagement.Api.csproj" />
     <Project Path="src/backend/gateway/StreamForge.Gateway.Api.csproj" />
     <Project Path="src/backend/services/feed/StreamForge.Feed.Api.csproj" />
     <Project Path="src/backend/services/playback/StreamForge.Playback.Api.csproj" />
@@ -8,6 +9,8 @@
     <Project Path="src/backend/workers/transcoding/StreamForge.Transcoding.Worker.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/backend/integration/StreamForge.Engagement.IntegrationTests/StreamForge.Engagement.IntegrationTests.csproj" />
+    <Project Path="tests/backend/unit/StreamForge.Engagement.UnitTests/StreamForge.Engagement.UnitTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Identity.IntegrationTests/StreamForge.Identity.IntegrationTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Identity.UnitTests/StreamForge.Identity.UnitTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Feed.IntegrationTests/StreamForge.Feed.IntegrationTests.csproj" />

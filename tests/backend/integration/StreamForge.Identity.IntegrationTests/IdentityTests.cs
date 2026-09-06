@@ -178,6 +178,28 @@ public sealed class IdentityTests(IdentityApiFactory factory) : IClassFixture<Id
         Assert.NotNull(blocked.Headers.RetryAfter);
     }
 
+    [Fact]
+    public async Task PublicProfiles_ReturnOnlyRequestedIdsAndUsernamesAndEnforceBatchLimit()
+    {
+        using var browser = factory.Browser();
+        var registration = Registration();
+        using var createdResponse = await browser.PostAsJsonAsync("/api/auth/register", registration);
+        createdResponse.EnsureSuccessStatusCode();
+        var created = (await createdResponse.Content.ReadFromJsonAsync<AuthResponse>())!;
+
+        using var lookup = await browser.GetAsync(
+            $"/api/users?ids={created.User.Id:D}&ids={Guid.NewGuid():D}");
+        lookup.EnsureSuccessStatusCode();
+        var profiles = await lookup.Content.ReadFromJsonAsync<PublicProfile[]>();
+        var profile = Assert.Single(profiles!);
+        Assert.Equal(created.User.Id, profile.Id);
+        Assert.Equal(created.User.Username, profile.Username);
+
+        var query = string.Join('&', Enumerable.Range(0, 51).Select(_ => $"ids={Guid.NewGuid():D}"));
+        using var tooMany = await browser.GetAsync($"/api/users?{query}");
+        Assert.Equal(HttpStatusCode.BadRequest, tooMany.StatusCode);
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     { public override DateTimeOffset GetUtcNow() => now; }
 

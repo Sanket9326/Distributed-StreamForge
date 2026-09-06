@@ -1,7 +1,7 @@
 # Architecture
 
 This service map describes the intended platform boundaries. The Gateway,
-Identity, Upload, Transcoding, Feed, and Playback boundaries and their asynchronous handoffs are
+Identity, Upload, Transcoding, Feed, Playback, and Engagement boundaries and their asynchronous handoffs are
 implemented; the remaining boundaries are proposals and must stay empty until
 explicitly selected.
 
@@ -22,6 +22,13 @@ Web / Nginx -> Gateway / YARP -> Upload -> private MinIO source object
                          Feed metadata + stable HLS URL through Gateway -> Web
                          Playback signed HLS manifests through Gateway -> Web
                          Browser -> signed private segments directly from MinIO
+
+                         Web -> Engagement -> Kafka reaction/view topics
+                                  |              |
+                                  |              v
+                                  |        Engagement consumers -> PostgreSQL aggregates
+                                  `-> synchronous comments -> PostgreSQL
+                                  `-> rebuildable Redis counts and membership
 ```
 
 The Web application, Gateway, Upload service, and Feed service are separate build
@@ -61,6 +68,7 @@ uses the video ID as the Kafka key; future consumers must deduplicate by event I
 | Processing | Proposed future cross-service workflow orchestration |
 | Transcoding | Durable job state, retries, FFmpeg probing, and MP4 renditions |
 | Playback | V2 HLS projection, strict manifest rewriting, and signed private segment delivery |
+| Engagement | Reactions, comments, qualified visible views, Kafka consumers, and Redis projections |
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |
 
@@ -78,3 +86,7 @@ Authentication uses a separate Identity service, its PostgreSQL schema and a
 shared Redis instance. Gateway validates opaque cookies for uploads while feed
 and playback remain public. Nginx terminates HTTPS for app/API and signed media.
 See [ADR 0006](decisions/0006-session-authentication.md).
+
+The watch route obtains canonical video metadata from Feed, public usernames from
+Identity, and reactions, comments, and visible counts from Engagement. See
+[ADR 0007](decisions/0007-engagement-projections.md).
