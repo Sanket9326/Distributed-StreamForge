@@ -69,6 +69,11 @@ Before starting Feed outside Compose, supply `ConnectionStrings__FeedDatabase`,
 browser-visible `ObjectStorage__PublicEndpoint`. Both upload and completion
 topics and the rendition bucket must already exist.
 
+Before starting Engagement outside Compose, supply
+`ConnectionStrings__EngagementDatabase`, `ConnectionStrings__Redis`,
+`Kafka__BootstrapServers`, and `Feed__BaseAddress`. Engagement creates its two
+output topics and consumes the completed-video topic.
+
 ```powershell
 dotnet run --project src/backend/services/upload/StreamForge.Upload.Api.csproj
 ```
@@ -82,6 +87,10 @@ dotnet run --project src/backend/services/feed/StreamForge.Feed.Api.csproj
 ```
 
 ```powershell
+dotnet run --project src/backend/services/engagement/StreamForge.Engagement.Api.csproj
+```
+
+```powershell
 dotnet run --project src/backend/gateway/StreamForge.Gateway.Api.csproj
 ```
 
@@ -91,8 +100,9 @@ npm start
 ```
 
 Open `https://localhost:4200`. The Angular development proxy sends `/api` requests
-to the Gateway on port 5080; Identity listens on port 5084; the Gateway sends upload requests to Upload on port
-5081 and feed requests to Feed on port 5082.
+to the Gateway on port 5080; Identity listens on port 5084 and Engagement on
+port 5085; the Gateway sends upload requests to Upload on port 5081 and feed
+requests to Feed on port 5082.
 
 ## Run with Docker
 
@@ -191,6 +201,10 @@ docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 | Feed | `ObjectStorage:PublicEndpoint` | Required browser-visible signing endpoint |
 | Feed | `ObjectStorage:RenditionsBucket` | `streamforge-renditions` |
 | Feed | `ObjectStorage:SignedUrlExpirySeconds` | `3600` |
+| Engagement | `ConnectionStrings:EngagementDatabase` | Required; isolated `engagement` schema |
+| Engagement | `ConnectionStrings:Redis` | Required rebuildable projection store |
+| Engagement | `Kafka:ReactionTopic` / `ViewTopic` | `video-engagement-reactions` / `video-engagement-views` |
+| Engagement | `Engagement:ViewFlushSeconds` / `ViewFlushSize` | `300` / `10000` |
 | Playback | `ConnectionStrings:PlaybackDatabase` | Required; isolated `playback` schema |
 | Playback | `Kafka:ConsumerGroupId` | `streamforge-playback-v1` |
 | Playback | `Playback:SignedUrlExpirySeconds` | `3600` |

@@ -85,6 +85,39 @@ public sealed class FeedQueryService(
         return await MapRenditionsAsync(video.Renditions, cancellationToken);
     }
 
+    public async Task<FeedVideoResponse> GetVideoAsync(
+        Guid videoId,
+        CancellationToken cancellationToken)
+    {
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var video = await dbContext.Videos
+            .AsNoTracking()
+            .Include(candidate => candidate.Renditions)
+            .SingleOrDefaultAsync(candidate =>
+                candidate.Id == videoId &&
+                candidate.HasMetadata &&
+                candidate.HasCompletion &&
+                candidate.Renditions.Any(),
+                cancellationToken);
+        if (video is null)
+        {
+            throw new FeedRequestException(
+                StatusCodes.Status404NotFound,
+                "Video unavailable",
+                "The requested video is not available in the feed.");
+        }
+
+        return await MapAsync(video, cancellationToken);
+    }
+
+    public async Task<bool> IsVideoAvailableAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await dbContext.Videos.AsNoTracking().AnyAsync(video =>
+            video.Id == videoId && video.HasMetadata && video.HasCompletion && video.Renditions.Any(),
+            cancellationToken);
+    }
+
     public async Task<DateTimeOffset?> GetCompletionAsync(
         Guid videoId,
         CancellationToken cancellationToken)
@@ -101,6 +134,7 @@ public sealed class FeedQueryService(
         FeedVideo video,
         CancellationToken cancellationToken) => new(
             video.Id,
+            video.OwnerId,
             video.Title!,
             video.Description,
             video.Hashtags,

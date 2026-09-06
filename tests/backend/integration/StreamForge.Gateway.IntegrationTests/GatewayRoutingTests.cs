@@ -105,6 +105,18 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task EngagementReadsAndPublicProfiles_AreAnonymous()
+    {
+        using var client = factory.CreateClient();
+        using var summaries = await client.GetAsync(
+            $"/api/engagement/videos/summaries?ids={Guid.NewGuid():D}");
+        using var profiles = await client.GetAsync($"/api/users?ids={Guid.NewGuid():D}");
+
+        Assert.Equal(HttpStatusCode.OK, summaries.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, profiles.StatusCode);
+    }
+
+    [Fact]
     public async Task Health_ReturnsOk()
     {
         using var client = factory.CreateClient();

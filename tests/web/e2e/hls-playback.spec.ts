@@ -96,7 +96,14 @@ test.describe("full Compose adaptive HLS playback", () => {
     await page.goto("/");
     await page.getByRole("button", { name: `Watch ${title}`, exact: true }).click();
     const player = page.getByLabel(`Play ${title}`, { exact: true });
+    const qualifiedView = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/api\/engagement\/videos\/.+\/views$/.test(new URL(response.url()).pathname),
+      { timeout: 30_000 },
+    );
     await player.evaluate((video: HTMLVideoElement) => video.play());
+    await qualifiedView;
     await expect
       .poll(() => requested.some((url) => url.includes("/360p/")), { timeout: 30_000 })
       .toBeTruthy();
@@ -119,6 +126,42 @@ test.describe("full Compose adaptive HLS playback", () => {
     await expect
       .poll(() => requested.slice(before).some((url) => url.includes("/720p/")), { timeout: 30_000 })
       .toBeTruthy();
+
+    const like = page.getByRole("button", { name: "Like video", exact: true });
+    await like.click();
+    await expect(like).toHaveAttribute("aria-pressed", "true");
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Like video", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    const comment = `Engagement E2E ${Date.now()}`;
+    await page.getByPlaceholder("Add a comment…").fill(comment);
+    await page.getByRole("button", { name: "Comment", exact: true }).click();
+    await expect(page.getByText(comment, { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    const edited = `${comment} edited`;
+    await page.locator(".comment textarea").fill(edited);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText(edited, { exact: true })).toBeVisible();
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByText(edited, { exact: true })).toHaveCount(0);
+
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, "share", { configurable: true, value: undefined }),
+    );
+    await page.getByRole("button", { name: "Share", exact: true }).click();
+    await expect(page.getByText("Link copied", { exact: true })).toBeVisible();
+    const sharedUrl = await page.evaluate(() => navigator.clipboard.readText());
+    expect(new URL(sharedUrl).pathname).toMatch(/^\/watch\/[0-9a-f-]+$/);
+    expect(sharedUrl).not.toContain("streamforge-renditions");
+    const sharedPage = await context.newPage();
+    await sharedPage.goto(sharedUrl);
+    await expect(sharedPage.getByRole("heading", { name: title, exact: true })).toBeVisible();
+    await sharedPage.close();
 
     let manifestReloads = 0;
     await page.route("**/api/playback/**", async (route) => {

@@ -11,6 +11,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0004: Event-built home feed and signed progressive playback](0004-feed-read-model-and-progressive-playback.md)
 - [0005: Adaptive HLS packaging and private direct delivery](0005-adaptive-hls-playback.md)
 - [0006: Identity-owned accounts and Redis browser sessions](0006-session-authentication.md)
+- [0007: Engagement-owned reactions, comments, and visible views](0007-engagement-projections.md)
 
 ```markdown
 # NNNN: Decision title

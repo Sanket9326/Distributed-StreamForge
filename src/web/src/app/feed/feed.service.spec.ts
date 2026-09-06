@@ -29,4 +29,13 @@ describe('FeedService', () => {
     expect(request.request.method).toBe('GET');
     request.flush({ items: [], nextCursor: null });
   });
+
+  it('loads a single video for a direct watch link', () => {
+    const id = 'e2c1bb10-4340-452f-9fc6-a68cf4b12457';
+    service.getVideo(id).subscribe();
+
+    const request = http.expectOne(`/api/feed/videos/${id}`);
+    expect(request.request.method).toBe('GET');
+    request.flush({ id, ownerId: null, title: 'Direct watch', renditions: [] });
+  });
 });

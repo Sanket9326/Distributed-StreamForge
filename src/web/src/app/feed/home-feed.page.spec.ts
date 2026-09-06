@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HomeFeedPage } from './home-feed.page';
+import { provideRouter, Router } from '@angular/router';
 
 describe('HomeFeedPage', () => {
   let fixture: ComponentFixture<HomeFeedPage>;
@@ -23,7 +24,7 @@ describe('HomeFeedPage', () => {
     globalThis.IntersectionObserver = TestObserver as unknown as typeof IntersectionObserver;
     await TestBed.configureTestingModule({
       imports: [HomeFeedPage],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
     fixture = TestBed.createComponent(HomeFeedPage);
     http = TestBed.inject(HttpTestingController);
@@ -44,6 +45,8 @@ describe('HomeFeedPage', () => {
       (request) => request.url === '/api/feed/videos' && request.params.get('limit') === '10',
     );
     initial.flush({ items: [video()], nextCursor: 'opaque-cursor' });
+    http.expectOne('/api/engagement/videos/summaries?ids=e2c1bb10-4340-452f-9fc6-a68cf4b12457')
+      .flush([{ videoId: video().id, likeCount: 0, dislikeCount: 0, viewCount: 0, commentCount: 0 }]);
     fixture.detectChanges();
 
     const sentinelObserver = observers.find((observer) =>
@@ -63,33 +66,32 @@ describe('HomeFeedPage', () => {
         request.params.get('cursor') === 'opaque-cursor',
     );
     next.flush({ items: [], nextCursor: null });
+    http.expectOne('/api/engagement/videos/summaries?ids=e2c1bb10-4340-452f-9fc6-a68cf4b12457')
+      .flush([{ videoId: video().id, likeCount: 0, dislikeCount: 0, viewCount: 0, commentCount: 0 }]);
   });
 
-  it('opens a browse card in the full watch layout', async () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+  it('navigates a browse card to its stable watch route', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const initial = http.expectOne(
       (request) => request.url === '/api/feed/videos' && request.params.get('limit') === '10',
     );
     initial.flush({ items: [video()], nextCursor: null });
+    http.expectOne('/api/engagement/videos/summaries?ids=e2c1bb10-4340-452f-9fc6-a68cf4b12457')
+      .flush([{ videoId: video().id, likeCount: 0, dislikeCount: 0, viewCount: 0, commentCount: 0 }]);
     fixture.detectChanges();
 
     const browseLink = fixture.nativeElement.querySelector('.browse-link') as HTMLButtonElement;
     browseLink.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.watch-shell')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.watch-title').textContent).toContain(
-      'First video',
-    );
-    expect(fixture.nativeElement.textContent).toContain('Back to Home');
-    await vi.waitFor(() => expect(HTMLMediaElement.prototype.play).toHaveBeenCalled());
-    expect(scrollTo).toHaveBeenCalled();
-    scrollTo.mockRestore();
+    expect(navigate).toHaveBeenCalledWith(['/watch', video().id]);
   });
 
   function video() {
     return {
       id: 'e2c1bb10-4340-452f-9fc6-a68cf4b12457',
+      ownerId: null,
       title: 'First video',
       description: null,
       hashtags: [],

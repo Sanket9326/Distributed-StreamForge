@@ -50,6 +50,27 @@ public sealed class FeedQueryServiceTests
         Assert.Equal(400, exception.StatusCode);
     }
 
+    [Fact]
+    public async Task GetVideo_ReturnsOwnerAndFreshSignedPlaybackForReadyVideoOnly()
+    {
+        var factory = CreateFactory();
+        var videoId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var ready = ReadyVideo(videoId, "Direct watch", DateTimeOffset.UtcNow);
+        ready.OwnerId = ownerId;
+        await SeedAsync(factory, ready);
+        var service = new FeedQueryService(factory, new FeedCursorCodec(), new FakeSigner());
+
+        var result = await service.GetVideoAsync(videoId, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(ownerId, result.OwnerId);
+        Assert.Contains("signed=true", Assert.Single(result.Renditions).PlaybackUrl);
+        var missing = await Assert.ThrowsAsync<FeedRequestException>(() =>
+            service.GetVideoAsync(Guid.NewGuid(), CancellationToken.None));
+        Assert.Equal(404, missing.StatusCode);
+    }
+
     private static FeedVideo ReadyVideo(Guid id, string title, DateTimeOffset availableAtUtc) => new()
     {
         Id = id,

@@ -1,21 +1,31 @@
 import { Routes } from '@angular/router';
-import { HomeFeedPage } from './feed/home-feed.page';
-import { UploadPage } from './upload/upload.page';
-import { AuthPage } from './auth/auth.page';
 import { authGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
-  { path: '', component: HomeFeedPage, title: 'Home · StreamForge' },
+  {
+    path: '',
+    loadComponent: () => import('./feed/home-feed.page').then((module) => module.HomeFeedPage),
+    title: 'Home · StreamForge',
+  },
+  {
+    path: 'watch/:videoId',
+    loadComponent: () => import('./feed/watch.page').then((module) => module.WatchPage),
+    title: 'Watch · StreamForge',
+  },
   {
     path: 'upload',
-    component: UploadPage,
+    loadComponent: () => import('./upload/upload.page').then((module) => module.UploadPage),
     canActivate: [authGuard],
     title: 'Upload · StreamForge',
   },
-  { path: 'login', component: AuthPage, title: 'Log in · StreamForge' },
+  {
+    path: 'login',
+    loadComponent: () => import('./auth/auth.page').then((module) => module.AuthPage),
+    title: 'Log in · StreamForge',
+  },
   {
     path: 'register',
-    component: AuthPage,
+    loadComponent: () => import('./auth/auth.page').then((module) => module.AuthPage),
     data: { register: true },
     title: 'Create account · StreamForge',
   },

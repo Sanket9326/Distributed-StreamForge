@@ -1,0 +1,44 @@
+<main class="watch-shell">
+  <button class="back-button" type="button" (click)="back()"><span aria-hidden="true">←</span> Back to Home</button>
+  @if (loading()) {
+    <section class="watch-state" aria-busy="true">Preparing your video…</section>
+  } @else if (error()) {
+    <section class="watch-state error" role="alert">{{ error() }}</section>
+  } @else if (video(); as selected) {
+    <div class="watch-layout">
+      <section class="watch-primary" aria-label="Now playing">
+        <app-video-card
+          [video]="selected"
+          [summary]="summaryFor(selected.id)"
+          [creatorName]="creatorFor(selected)"
+          appearance="watch"
+          [autoplay]="true"
+          (playStarted)="onPlayStarted($event)"
+        />
+      </section>
+      <aside class="watch-rail" aria-label="Up next">
+        <div class="rail-heading"><h2>Up next</h2><span>Autoplay</span></div>
+        <div class="rail-chips" aria-label="Recommendation filters">
+          <button class="active" type="button" disabled title="Coming soon">All</button>
+          <button type="button" disabled title="Coming soon">Related</button>
+          <button type="button" disabled title="Coming soon">From StreamForge</button>
+        </div>
+        @if (recommendations().length) {
+          <div class="recommendation-list">
+            @for (candidate of recommendations(); track candidate.id) {
+              <app-video-card
+                [video]="candidate"
+                [summary]="summaryFor(candidate.id)"
+                [creatorName]="creatorFor(candidate)"
+                appearance="recommendation"
+                (watchRequested)="openWatch($event)"
+              />
+            }
+          </div>
+        } @else {
+          <div class="recommendation-empty">More recommendations will appear as videos finish processing.</div>
+        }
+      </aside>
+    </div>
+  }
+</main>

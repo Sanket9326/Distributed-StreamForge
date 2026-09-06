@@ -5,6 +5,7 @@ import {
   ElementRef,
   HostListener,
   OnDestroy,
+  OnInit,
   ViewChild,
   inject,
   input,
@@ -14,6 +15,15 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FeedRendition, FeedService, FeedVideo } from './feed.service';
 import { PlayerLevel, VideoPlayerAdapter } from './video-player.adapter';
+import {
+  EngagementService,
+  ReactionValue,
+  VideoComment,
+  VideoSummary,
+} from '../engagement/engagement.service';
+import { AuthService } from '../auth/auth.service';
+import { Router } from '@angular/router';
+import { ProfileService } from '../profiles/profile.service';
 
 export interface PlaybackQualityChanged {
   videoId: string;
@@ -28,18 +38,35 @@ export interface PlaybackQualityChanged {
   templateUrl: './video-card.component.html',
   styleUrl: './video-card.component.scss',
 })
-export class VideoCardComponent implements AfterViewInit, OnDestroy {
+export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('player') private player?: ElementRef<HTMLVideoElement>;
   readonly video = input.required<FeedVideo>();
   readonly appearance = input<'watch' | 'grid' | 'recommendation'>('watch');
   readonly autoplay = input(false);
+  readonly summary = input<VideoSummary | null>(null);
+  readonly creatorName = input('StreamForge Creator');
   readonly playStarted = output<HTMLVideoElement>();
   readonly watchRequested = output<FeedVideo>();
   readonly playbackQualityChanged = output<PlaybackQualityChanged>();
   protected readonly sourceUrl = signal('');
-  protected readonly liked = signal(false);
   protected readonly descriptionExpanded = signal(false);
-  protected readonly commentsOpen = signal(false);
+  protected readonly reaction = signal<ReactionValue>('none');
+  protected readonly reactionBusy = signal(false);
+  protected readonly reactionAnimating = signal(false);
+  protected readonly likeCount = signal(0);
+  protected readonly viewCount = signal(0);
+  protected readonly commentCount = signal(0);
+  protected readonly socialError = signal('');
+  protected readonly shareStatus = signal('');
+  protected readonly comments = signal<VideoComment[]>([]);
+  protected readonly commentAuthors = signal(new Map<string, string>());
+  protected readonly commentsLoading = signal(false);
+  protected readonly commentsLoadingMore = signal(false);
+  protected readonly commentsCursor = signal<string | null>(null);
+  protected readonly commentDraft = signal('');
+  protected readonly commentBusy = signal(false);
+  protected readonly editingCommentId = signal<string | null>(null);
+  protected readonly editingBody = signal('');
   protected readonly playbackError = signal('');
   protected readonly refreshing = signal(false);
   protected readonly qualityMenuOpen = signal(false);
@@ -54,6 +81,10 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
   protected readonly playing = signal(false);
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly feedService = inject(FeedService);
+  protected readonly auth = inject(AuthService);
+  private readonly engagement = inject(EngagementService);
+  private readonly profiles = inject(ProfileService);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private observer?: IntersectionObserver;
   private adapter?: VideoPlayerAdapter;
@@ -61,6 +92,19 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
   private mp4Retried = false;
   private autoplayAttempted = false;
   private playRequest = 0;
+  private watchedMilliseconds = 0;
+  private playingStartedAt: number | null = null;
+  private viewSubmitted = false;
+  private readonly viewSessionId = globalThis.crypto?.randomUUID?.() ??
+    `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  ngOnInit(): void {
+    const summary = this.summary();
+    this.likeCount.set(summary?.likeCount ?? 0);
+    this.viewCount.set(summary?.viewCount ?? 0);
+    this.commentCount.set(summary?.commentCount ?? 0);
+    if (this.appearance() === 'watch') void this.initializeEngagement();
+  }
 
   ngAfterViewInit(): void {
     if (this.appearance() !== 'watch') {
@@ -91,6 +135,7 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
     this.observer.observe(this.host.nativeElement);
   }
   ngOnDestroy(): void {
+    this.stopWatchClock();
     this.observer?.disconnect();
     this.adapter?.destroy();
   }
@@ -110,8 +155,10 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
     this.playing.set(true);
     this.startingPlayback.set(false);
     this.autoplayBlocked.set(false);
+    this.playingStartedAt ??= Date.now();
   }
   protected onPause(): void {
+    this.stopWatchClock();
     this.playing.set(false);
     this.startingPlayback.set(false);
   }
@@ -132,11 +179,22 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
   protected onVolumeChange(): void {
     if (!this.player?.nativeElement.muted) this.startedMuted.set(false);
   }
-  protected toggleLike(): void {
-    this.liked.update((v) => !v);
+  protected onWaiting(): void {
+    this.stopWatchClock();
   }
-  protected toggleComments(): void {
-    this.commentsOpen.update((v) => !v);
+
+  protected onTimeUpdate(): void {
+    if (this.viewSubmitted || this.playingStartedAt === null) return;
+    if (this.watchedMilliseconds + Date.now() - this.playingStartedAt >= 10_000) {
+      this.stopWatchClock();
+      this.viewSubmitted = true;
+      void this.submitQualifiedView();
+    }
+  }
+
+  protected chooseReaction(value: 'like' | 'dislike'): void {
+    if (this.reactionBusy()) return;
+    void this.updateReaction(this.reaction() === value ? 'none' : value);
   }
   protected toggleDescription(): void {
     this.descriptionExpanded.update((v) => !v);
@@ -149,7 +207,88 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
     this.watchRequested.emit(this.video());
   }
   protected creatorInitial(): string {
-    return this.video().title.trim().charAt(0).toUpperCase() || 'S';
+    return this.creatorName().trim().charAt(0).toUpperCase() || 'S';
+  }
+
+  protected compactCount(value: number): string {
+    return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  }
+
+  protected async shareVideo(): Promise<void> {
+    const url = `${window.location.origin}/watch/${this.video().id}`;
+    this.shareStatus.set('');
+    try {
+      if (navigator.share) await navigator.share({ title: this.video().title, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        this.shareStatus.set('Link copied');
+      }
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException && error.name === 'AbortError'))
+        this.shareStatus.set('Could not share this link');
+    }
+  }
+
+  protected onCommentInput(event: Event): void {
+    this.commentDraft.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected onEditInput(event: Event): void {
+    this.editingBody.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  protected addComment(): void {
+    if (!this.auth.user()) { this.goToLogin(); return; }
+    if (!this.commentDraft().trim() || this.commentBusy()) return;
+    void this.createComment();
+  }
+
+  protected startEditing(comment: VideoComment): void {
+    this.editingCommentId.set(comment.id);
+    this.editingBody.set(comment.body);
+  }
+
+  protected cancelEditing(): void {
+    this.editingCommentId.set(null);
+    this.editingBody.set('');
+  }
+
+  protected saveComment(comment: VideoComment): void {
+    if (!this.editingBody().trim() || this.commentBusy()) return;
+    void this.updateComment(comment);
+  }
+
+  protected removeComment(comment: VideoComment): void {
+    if (!window.confirm('Delete this comment permanently?')) return;
+    void this.deleteComment(comment);
+  }
+
+  protected loadMoreComments(): void {
+    if (this.commentsCursor() && !this.commentsLoadingMore()) void this.loadComments(true);
+  }
+
+  protected canManage(comment: VideoComment): boolean {
+    return this.auth.user()?.id === comment.authorId;
+  }
+
+  protected commentAuthor(comment: VideoComment): string {
+    return this.commentAuthors().get(comment.authorId) ?? 'StreamForge user';
+  }
+
+  protected commentInitial(comment: VideoComment): string {
+    return this.commentAuthor(comment).charAt(0).toUpperCase() || 'S';
+  }
+
+  protected isEdited(comment: VideoComment): boolean {
+    return comment.updatedAtUtc !== comment.createdAtUtc;
+  }
+
+  protected relativeTime(value: string): string {
+    const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
+    if (seconds < 60) return 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
   }
   protected selectAuto(): void {
     const changed = this.mode() !== 'auto';
@@ -212,6 +351,125 @@ export class VideoCardComponent implements AfterViewInit, OnDestroy {
   }
   protected hasLongDescription(): boolean {
     return (this.video().description?.length ?? 0) > 180;
+  }
+
+  private async initializeEngagement(): Promise<void> {
+    await this.auth.initialize();
+    if (this.auth.user()) {
+      try { this.reaction.set(await this.engagement.getReaction(this.video().id)); }
+      catch { /* Counts and comments remain usable if personal state is temporarily unavailable. */ }
+    }
+    await this.loadComments(false);
+  }
+
+  private async updateReaction(next: ReactionValue): Promise<void> {
+    if (!this.auth.user()) await this.auth.initialize();
+    if (!this.auth.user()) { this.goToLogin(); return; }
+    const previous = this.reaction();
+    const previousCount = this.likeCount();
+    this.reaction.set(next);
+    if (previous === 'like' && next !== 'like') this.likeCount.update((count) => Math.max(0, count - 1));
+    else if (previous !== 'like' && next === 'like') this.likeCount.update((count) => count + 1);
+    this.reactionBusy.set(true);
+    this.reactionAnimating.set(true);
+    this.socialError.set('');
+    setTimeout(() => this.reactionAnimating.set(false), 280);
+    try {
+      const response = await this.engagement.setReaction(this.video().id, next);
+      this.reaction.set(response.reaction);
+      if (response.likeCount !== null) this.likeCount.set(response.likeCount);
+    } catch {
+      this.reaction.set(previous);
+      this.likeCount.set(previousCount);
+      this.socialError.set('Your reaction was not saved. Please try again.');
+    } finally {
+      this.reactionBusy.set(false);
+    }
+  }
+
+  private async submitQualifiedView(): Promise<void> {
+    try {
+      const response = await this.engagement.recordView(this.video().id, this.viewSessionId);
+      if (response.viewCount !== null) this.viewCount.set(response.viewCount);
+      else if (response.counted) this.viewCount.update((count) => count + 1);
+    } catch {
+      this.viewSubmitted = false;
+      // Keep the last summary count visible. View reporting retries silently while
+      // playback continues because a temporary analytics failure should not
+      // replace otherwise valid engagement data with an error message.
+    }
+  }
+
+  private stopWatchClock(): void {
+    if (this.playingStartedAt === null) return;
+    this.watchedMilliseconds += Date.now() - this.playingStartedAt;
+    this.playingStartedAt = null;
+  }
+
+  private async loadComments(append: boolean): Promise<void> {
+    if (append) this.commentsLoadingMore.set(true);
+    else this.commentsLoading.set(true);
+    try {
+      const page = await this.engagement.getComments(
+        this.video().id,
+        append ? this.commentsCursor() : null,
+      );
+      this.comments.set(append ? [...this.comments(), ...page.items] : page.items);
+      this.commentCount.set(page.totalCount);
+      this.commentsCursor.set(page.nextCursor);
+      await this.resolveCommentAuthors(page.items);
+    } catch {
+      this.socialError.set('Comments could not be loaded. Please try again.');
+    } finally {
+      this.commentsLoading.set(false);
+      this.commentsLoadingMore.set(false);
+    }
+  }
+
+  private async createComment(): Promise<void> {
+    this.commentBusy.set(true);
+    this.socialError.set('');
+    try {
+      const result = await this.engagement.createComment(this.video().id, this.commentDraft());
+      this.comments.update((comments) => [result.comment, ...comments]);
+      this.commentCount.set(result.commentCount);
+      this.commentDraft.set('');
+      await this.resolveCommentAuthors([result.comment]);
+    } catch { this.socialError.set('Your comment was not added. Please try again.'); }
+    finally { this.commentBusy.set(false); }
+  }
+
+  private async updateComment(comment: VideoComment): Promise<void> {
+    this.commentBusy.set(true);
+    this.socialError.set('');
+    try {
+      const result = await this.engagement.updateComment(comment.id, this.editingBody());
+      this.comments.update((comments) => comments.map((item) => item.id === comment.id ? result.comment : item));
+      this.cancelEditing();
+    } catch { this.socialError.set('Your comment was not updated. Please try again.'); }
+    finally { this.commentBusy.set(false); }
+  }
+
+  private async deleteComment(comment: VideoComment): Promise<void> {
+    this.commentBusy.set(true);
+    this.socialError.set('');
+    try {
+      const count = await this.engagement.deleteComment(comment.id);
+      this.comments.update((comments) => comments.filter((item) => item.id !== comment.id));
+      this.commentCount.set(count);
+    } catch { this.socialError.set('Your comment was not deleted. Please try again.'); }
+    finally { this.commentBusy.set(false); }
+  }
+
+  private async resolveCommentAuthors(comments: VideoComment[]): Promise<void> {
+    try {
+      const names = await this.profiles.resolve(comments.map((comment) => comment.authorId));
+      this.commentAuthors.update((current) => new Map([...current, ...names]));
+    } catch { /* Generic author labels remain available. */ }
+  }
+
+  private goToLogin(): void {
+    void this.router.navigate(['/login'], { queryParams: { returnUrl: `/watch/${this.video().id}` } });
   }
 
   private ensureSource(): void {

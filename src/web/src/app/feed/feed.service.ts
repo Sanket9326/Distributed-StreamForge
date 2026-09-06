@@ -16,6 +16,7 @@ export interface FeedRendition {
 
 export interface FeedVideo {
   id: string;
+  ownerId: string | null;
   title: string;
   description: string | null;
   hashtags: string[];
@@ -41,6 +42,10 @@ export class FeedService {
     }
 
     return this.http.get<FeedPage>('/api/feed/videos', { params });
+  }
+
+  getVideo(videoId: string): Observable<FeedVideo> {
+    return this.http.get<FeedVideo>(`/api/feed/videos/${videoId}`);
   }
 
   refreshRenditions(videoId: string): Observable<FeedRendition[]> {

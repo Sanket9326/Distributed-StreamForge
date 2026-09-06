@@ -6,6 +6,7 @@ public sealed record FeedPageResponse(
 
 public sealed record FeedVideoResponse(
     Guid Id,
+    Guid? OwnerId,
     string Title,
     string? Description,
     IReadOnlyList<string> Hashtags,

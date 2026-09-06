@@ -14,7 +14,13 @@ public sealed class SessionMiddleware(RequestDelegate next)
             context.Request.Headers.Remove(header);
         var path = context.Request.Path;
         var auth = path.StartsWithSegments("/api/auth");
-        var protectedRoute = path.StartsWithSegments("/api/uploads") || path.Equals("/api/auth/me");
+        var engagement = path.StartsWithSegments("/api/engagement");
+        var reaction = engagement && path.Value?.EndsWith("/reaction", StringComparison.OrdinalIgnoreCase) == true;
+        var commentMutation = engagement &&
+            (HttpMethods.IsPost(context.Request.Method) && path.Value?.Contains("/comments", StringComparison.OrdinalIgnoreCase) == true ||
+             HttpMethods.IsPatch(context.Request.Method) || HttpMethods.IsDelete(context.Request.Method));
+        var protectedRoute = path.StartsWithSegments("/api/uploads") || path.Equals("/api/auth/me") ||
+            reaction || commentMutation;
         // Only auth/protected routes touch Redis. Public playback survives a Redis outage.
         if (auth || protectedRoute)
         {

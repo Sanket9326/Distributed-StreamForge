@@ -11,6 +11,9 @@
         (play)="onPlay()"
         (playing)="onPlaying()"
         (pause)="onPause()"
+        (waiting)="onWaiting()"
+        (ended)="onPause()"
+        (timeupdate)="onTimeUpdate()"
         (volumechange)="onVolumeChange()"
         (error)="onPlaybackError()"
       ></video>
@@ -81,28 +84,54 @@
       <div class="channel">
         <span class="channel-avatar" aria-hidden="true">{{ creatorInitial() }}</span>
         <div>
-          <strong>StreamForge Creator</strong>
-          <small>Local channel</small>
+          <strong>{{ creatorName() }}</strong>
+          <small>StreamForge creator</small>
         </div>
-        <button type="button" class="subscribe-button">Subscribe</button>
+        <button type="button" class="subscribe-button" disabled title="Coming soon">Subscribe</button>
       </div>
 
       <div class="video-actions" aria-label="Video actions">
-        <button type="button" [attr.aria-pressed]="liked()" (click)="toggleLike()">
-          <span aria-hidden="true">{{ liked() ? '♥' : '♡' }}</span>
-          {{ liked() ? 'Liked' : 'Like' }}
-        </button>
-        <button type="button"><span aria-hidden="true">↗</span> Share</button>
-        <button type="button"><span aria-hidden="true">＋</span> Save</button>
-        <button type="button" aria-label="More actions">•••</button>
+        <div class="reaction-group" [class.pulse]="reactionAnimating()">
+          <button
+            type="button"
+            [disabled]="reactionBusy()"
+            [attr.aria-pressed]="reaction() === 'like'"
+            aria-label="Like video"
+            (click)="chooseReaction('like')"
+          >
+            <svg class="reaction-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 10v11H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3Zm0 11h10.4a2 2 0 0 0 1.92-1.45l2-7A2 2 0 0 0 19.4 10H14l1-4.1A3.2 3.2 0 0 0 12 2L7 10v11Z" />
+            </svg>
+            {{ compactCount(likeCount()) }}
+          </button>
+          <button
+            type="button"
+            [disabled]="reactionBusy()"
+            [attr.aria-pressed]="reaction() === 'dislike'"
+            aria-label="Dislike video"
+            (click)="chooseReaction('dislike')"
+          >
+            <svg class="reaction-icon thumb-down" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 10v11H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3Zm0 11h10.4a2 2 0 0 0 1.92-1.45l2-7A2 2 0 0 0 19.4 10H14l1-4.1A3.2 3.2 0 0 0 12 2L7 10v11Z" />
+            </svg>
+          </button>
+        </div>
+        <button type="button" (click)="shareVideo()"><span aria-hidden="true">↗</span> Share</button>
+        <button type="button" disabled title="Coming soon"><span aria-hidden="true">＋</span> Watch later</button>
+        <button type="button" disabled title="Coming soon" aria-label="More actions">•••</button>
+        <span class="action-status" role="status">{{ shareStatus() }}</span>
       </div>
     </div>
+
+    @if (socialError()) {
+      <p class="social-error" role="alert">{{ socialError() }}</p>
+    }
 
     <section
       class="description-card"
       [class.collapsed]="hasLongDescription() && !descriptionExpanded()"
     >
-      <strong>{{ relativeUploadTime() }} · {{ video().renditions.length }} qualities</strong>
+      <strong>{{ compactCount(viewCount()) }} views · {{ relativeUploadTime() }}</strong>
       @if (video().hashtags.length) {
         <span class="hashtags">
           @for (hashtag of video().hashtags; track hashtag) {
@@ -118,20 +147,59 @@
       }
     </section>
 
-    <button
-      class="comments-toggle"
-      type="button"
-      [attr.aria-expanded]="commentsOpen()"
-      (click)="toggleComments()"
-    >
-      <span>Comments</span
-      ><small>{{ commentsOpen() ? 'Hide discussion' : 'Join the discussion' }}</small>
-    </button>
-    @if (commentsOpen()) {
-      <div class="comments-notice" role="status">
-        Comments are coming in a later iteration. Nothing is saved yet.
-      </div>
-    }
+    <section class="comments-section" aria-labelledby="comments-heading">
+      <header><h2 id="comments-heading">{{ compactCount(commentCount()) }} Comments</h2><button type="button" disabled title="Coming soon">Sort by</button></header>
+      @if (auth.user(); as user) {
+        <form class="comment-form" (submit)="$event.preventDefault(); addComment()">
+          <span class="comment-avatar" aria-hidden="true">{{ user.username.charAt(0).toUpperCase() }}</span>
+          <div class="comment-composer">
+            <textarea aria-label="Add a comment" maxlength="2000" rows="3" placeholder="Add a comment…" [value]="commentDraft()" (input)="onCommentInput($event)"></textarea>
+            <div class="comment-form-actions">
+              <small>{{ commentDraft().length }}/2,000</small>
+              <button type="submit" [disabled]="commentBusy() || !commentDraft().trim()">
+                {{ commentBusy() ? 'Posting…' : 'Comment' }}
+              </button>
+            </div>
+          </div>
+        </form>
+      } @else {
+        <button class="comment-login" type="button" (click)="addComment()">Log in to join the discussion</button>
+      }
+
+      @if (commentsLoading()) {
+        <p class="comments-state" aria-busy="true">Loading comments…</p>
+      } @else if (!comments().length) {
+        <p class="comments-state">No comments yet. Start the conversation.</p>
+      } @else {
+        <div class="comment-list">
+          @for (comment of comments(); track comment.id) {
+            <article class="comment">
+              <span class="comment-avatar" aria-hidden="true">{{ commentInitial(comment) }}</span>
+              <div class="comment-content">
+                <header>
+                  <strong>&#64;{{ commentAuthor(comment) }}</strong>
+                  <small>{{ relativeTime(comment.createdAtUtc) }} @if (isEdited(comment)) { <span>· edited</span> }</small>
+                </header>
+                @if (editingCommentId() === comment.id) {
+                  <div class="edit-composer">
+                    <textarea aria-label="Edit comment" maxlength="2000" rows="3" [value]="editingBody()" (input)="onEditInput($event)"></textarea>
+                    <div class="comment-actions"><button type="button" (click)="cancelEditing()">Cancel</button><button class="save-comment" type="button" [disabled]="commentBusy() || !editingBody().trim()" (click)="saveComment(comment)">Save</button></div>
+                  </div>
+                } @else {
+                  <p>{{ comment.body }}</p>
+                  @if (canManage(comment)) {
+                    <div class="comment-actions"><button type="button" (click)="startEditing(comment)">Edit</button><button type="button" (click)="removeComment(comment)">Delete</button></div>
+                  }
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+      @if (commentsCursor()) {
+        <button class="load-comments" type="button" [disabled]="commentsLoadingMore()" (click)="loadMoreComments()">{{ commentsLoadingMore() ? 'Loading…' : 'Load more comments' }}</button>
+      }
+    </section>
   </article>
 } @else {
   <article class="browse-card" [class.recommendation-card]="appearance() === 'recommendation'">
@@ -158,8 +226,8 @@
         <span class="browse-avatar" aria-hidden="true">{{ creatorInitial() }}</span>
         <span class="browse-copy">
           <strong>{{ video().title }}</strong>
-          <small>StreamForge Creator</small>
-          <small>{{ video().renditions.length }} qualities · {{ relativeUploadTime() }}</small>
+          <small>{{ creatorName() }}</small>
+          <small>{{ compactCount(summary()?.viewCount ?? 0) }} views · {{ relativeUploadTime() }}</small>
         </span>
         <span class="more-button" aria-hidden="true">⋮</span>
       </span>
