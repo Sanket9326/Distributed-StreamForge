@@ -1,83 +1,103 @@
-# StreamForge
+<div align="center">
 
-StreamForge is a learning-focused distributed video platform built with .NET
-microservices and an Angular web client. Its stable watch pages now include
-durable comments, mutually exclusive reactions, qualified view counts, public
-creator names, and stable-link sharing.
+# ▶ StreamForge
 
-## Implemented slice
+**Upload once. Press play. Share the conversation.**
 
-The platform accepts a source video, transcodes progressive MP4 renditions, and
-projects completed videos into a pageable home feed:
+A video platform built to learn how streaming works—from upload to playback.
 
-```text
-Angular Web / Nginx -> .NET Gateway / YARP -> .NET Upload Service
-                                                    |-> private MinIO object
-                                                    |-> PostgreSQL video + outbox
-                                                    `-> Kafka video-processing
-                                                               |
-                                                               v
-                                                   .NET Transcoding Worker
-                                                     |-> PostgreSQL jobs + outbox
-                                                     |-> FFmpeg MP4 renditions in MinIO
-                                                     `-> completed / failed Kafka topics
-                                                                  |
-                                                                  v
-                                                    .NET Feed API -> PostgreSQL read model
-                                                                  -> signed rendition URLs
-                                                                  |
-                                                                  v
-                                                 Angular /watch/:videoId
-                                                                  |
-                                             .NET Engagement API -> PostgreSQL
-                                                |                 -> Kafka consumers
-                                                `-> Redis visible projections
+<p>
+  <img src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge" alt=".NET 10" />
+  <img src="https://img.shields.io/badge/Angular-22-DD0031?style=for-the-badge" alt="Angular 22" />
+  <img src="https://img.shields.io/badge/Streaming-HLS-0891B2?style=for-the-badge" alt="HLS streaming" />
+  <img src="https://img.shields.io/badge/Local-Docker-2496ED?style=for-the-badge" alt="Local development with Docker" />
+</p>
+
+[Get started](#get-started) · [How it works](#how-it-works) · [Explore the docs](#explore-the-docs)
+
+</div>
+
+---
+
+StreamForge turns uploaded videos into multiple playback qualities, adds them to
+a browsable feed, and gives each video a watch page. It pairs an Angular web app
+with .NET microservices that handle accounts, uploads, processing, and engagement.
+
+## What you can do
+
+| | Feature | What it means |
+| --- | --- | --- |
+| 📤 | **Upload** | Sign in and upload MP4, MOV, WebM, or MKV videos up to 1 GB. |
+| ▶️ | **Watch** | Stream with automatic or manual quality selection, up to 1080p when the source supports it, with MP4 fallback. |
+| 🧭 | **Discover** | Browse ready videos and find more to watch in the recommendations sidebar. |
+| 💬 | **Interact** | Like or dislike, post and manage your comments, and see view counts. |
+| 🔗 | **Share** | Copy a stable watch-page link with the creator's public name on display. |
+
+Browsing and playback are public. Create an account to upload, react, and comment.
+
+## How it works
+
+```mermaid
+flowchart LR
+  A[Upload a video] --> B[Process in the background]
+  B --> C[Publish to the feed]
+  C --> D[Watch and interact]
+  style A fill:#312e81,color:#fff,stroke:#818cf8
+  style B fill:#164e63,color:#fff,stroke:#22d3ee
+  style C fill:#064e3b,color:#fff,stroke:#34d399
+  style D fill:#831843,color:#fff,stroke:#f472b6
 ```
 
-The Upload service streams MP4, MOV, WebM, and MKV files up to 1 GB directly to
-MinIO, commits metadata and an outbox event to PostgreSQL, and publishes the
-event to Kafka asynchronously. The independently scalable Transcoding worker
-durably accepts those events, generates non-upscaled H.264/AAC MP4 renditions,
-and publishes outcomes to dedicated Kafka topics. Feed independently joins the
-upload and completion events, returns only ready videos, and signs every
-available rendition so Angular can stream directly from private object storage.
-No backend service proxies playback bytes.
+**Under the hood:** YARP routes API requests to the .NET services. Kafka carries
+background events, FFmpeg prepares video qualities, and MinIO stores private
+media served through signed URLs. PostgreSQL stores durable data; Redis handles
+login sessions and engagement counters. HLS adapts playback quality as bandwidth
+changes.
 
-## Quick start with Docker
+## Get started
 
-Start Docker Desktop, copy the credential template, replace its placeholders,
-then run:
+You'll need **Docker Desktop**, **PowerShell**, and the **.NET 10 SDK** for local
+HTTPS certificates. Run these commands from the repository root:
 
 ```powershell
+# First-time setup: create your local configuration.
 Copy-Item .env.example .env
-docker compose -f infra/docker/compose.yml up --build
+./infra/docker/setup-local-https.ps1 -Trust
 ```
 
-The first build compiles the pinned MinIO Community release from its official
-source tag. The local interfaces are:
-
-- StreamForge: `https://localhost:8443`
-- Signed MinIO media API: `https://localhost:9443` (signed URLs only)
-- pgAdmin: `http://localhost:5050`
-- MinIO Console: `http://localhost:9001`
-
-pgAdmin uses `STREAMFORGE_PGADMIN_EMAIL` for its login email and the local
-`STREAMFORGE_POSTGRES_PASSWORD` for its login password. In pgAdmin, register a
-server with host `postgres`, port `5432`, and the database/user/password values
-from `.env`. Sign in to MinIO with `STREAMFORGE_MINIO_ACCESS_KEY` and
-`STREAMFORGE_MINIO_SECRET_KEY` from `.env`.
-
-Stop the services without deleting stored objects or database/Kafka data:
+Replace every placeholder in `.env` with your local credentials, then start:
 
 ```powershell
-docker compose -f infra/docker/compose.yml down
+docker compose --env-file .env -f infra/docker/compose.yml up --build
 ```
 
-See [development setup](docs/development/setup.md) for configuration and cleanup,
-[API documentation](docs/api/README.md) for HTTP and event contracts, the
-[architecture](docs/architecture/README.md) for ownership, and the
-[ingestion runbook](docs/operations/runbooks/README.md) for dependency failures.
+Open **[StreamForge → https://localhost:8443](https://localhost:8443)**, create an
+account, and upload your first video. It appears in the feed when processing finishes.
 
-User registration, login and logout are implemented with PostgreSQL accounts and
-24-hour Redis sessions. Browsing/playback stay public; uploads require login.
-See [HTTPS setup and authentication operations](docs/operations/runbooks/authentication.md).
+The first build takes longer because it compiles MinIO from its pinned source release.
+See the [setup guide](docs/development/setup.md) for local development, tests, and
+the database and storage consoles.
+
+<details>
+<summary><strong>Stop the local stack</strong></summary>
+
+This preserves uploaded videos and stored data:
+
+```powershell
+docker compose --env-file .env -f infra/docker/compose.yml down
+```
+
+</details>
+
+## Explore the docs
+
+| Start here | What you'll find |
+| --- | --- |
+| [Development setup](docs/development/setup.md) | Prerequisites, configuration, build, and test commands |
+| [Architecture](docs/architecture/README.md) · [Decisions](docs/architecture/decisions/README.md) | Service ownership and the reasoning behind the design |
+| [API reference](docs/api/README.md) | HTTP endpoints and event contracts |
+| [Operations](docs/operations/runbooks/README.md) · [Authentication & HTTPS](docs/operations/runbooks/authentication.md) | Troubleshooting and local certificate setup |
+
+<div align="center">
+  <sub>A learning project exploring distributed systems through video.</sub>
+</div>
