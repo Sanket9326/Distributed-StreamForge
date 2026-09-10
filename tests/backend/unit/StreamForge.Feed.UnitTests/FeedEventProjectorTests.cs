@@ -47,8 +47,42 @@ public sealed class FeedEventProjectorTests
         Assert.Equal("Out-of-order demo", video.Title);
         Assert.Equal(2, video.Renditions.Count);
         Assert.Equal(3, await dbContext.ConsumedMessages.CountAsync());
+        var outbox = await dbContext.OutboxMessages.SingleAsync();
+        Assert.Equal(videoId, outbox.VideoId);
+        Assert.Equal(1, outbox.Revision);
+        Assert.Equal("video-search-index", outbox.Topic);
         Assert.Equal(1, await dbContext.ConsumedMessages.CountAsync(message =>
             message.RejectionCode == "duplicate_event"));
+    }
+
+    [Fact]
+    public async Task ProjectAsync_UploadOnlyDoesNotEmitSearchRequest()
+    {
+        var factory = CreateFactory();
+        var projector = CreateProjector(factory);
+
+        await projector.ProjectAsync(Envelope("video-processing", 0, Uploaded(Guid.NewGuid())), CancellationToken.None);
+
+        await using var dbContext = await factory.CreateDbContextAsync();
+        Assert.Empty(dbContext.OutboxMessages);
+        Assert.Equal(0, (await dbContext.Videos.SingleAsync()).SearchRevision);
+    }
+
+    [Fact]
+    public async Task ProjectAsync_UploadBeforeCompletionEmitsOneRevisionOneSearchRequest()
+    {
+        var factory = CreateFactory();
+        var projector = CreateProjector(factory);
+        var videoId = Guid.NewGuid();
+
+        await projector.ProjectAsync(Envelope("video-processing", 0, Uploaded(videoId)), CancellationToken.None);
+        await projector.ProjectAsync(Envelope("video-transcoding-completed", 1, Completed(videoId)), CancellationToken.None);
+
+        await using var dbContext = await factory.CreateDbContextAsync();
+        var message = await dbContext.OutboxMessages.SingleAsync();
+        Assert.Equal(videoId, message.VideoId);
+        Assert.Equal(1, message.Revision);
+        Assert.Equal(1, (await dbContext.Videos.SingleAsync()).SearchRevision);
     }
 
     [Fact]
@@ -154,4 +188,11 @@ public sealed class FeedEventProjectorTests
             .Options;
         return new PooledDbContextFactory<FeedDbContext>(options);
     }
+
+    private static FeedEventProjector CreateProjector(IDbContextFactory<FeedDbContext> factory) => new(
+        factory,
+        Options.Create(new KafkaOptions()),
+        Options.Create(new ObjectStorageOptions()),
+        TimeProvider.System,
+        NullLogger<FeedEventProjector>.Instance);
 }

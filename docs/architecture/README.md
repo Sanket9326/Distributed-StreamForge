@@ -1,7 +1,7 @@
 # Architecture
 
 This service map describes the intended platform boundaries. The Gateway,
-Identity, Upload, Transcoding, Feed, Playback, and Engagement boundaries and their asynchronous handoffs are
+Identity, Upload, Transcoding, Feed, Playback, Engagement, and Search boundaries and their asynchronous handoffs are
 implemented; the remaining boundaries are proposals and must stay empty until
 explicitly selected.
 
@@ -23,6 +23,11 @@ Web / Nginx -> Gateway / YARP -> Upload -> private MinIO source object
                          Playback signed HLS manifests through Gateway -> Web
                          Browser -> signed private segments directly from MinIO
 
+                         Feed ready state -> outbox -> video-search-index
+                                                          |
+                                                          v
+                         Web -> Gateway -> Search API/indexer -> Elasticsearch
+
                          Web -> Engagement -> Kafka reaction/view topics
                                   |              |
                                   |              v
@@ -31,13 +36,13 @@ Web / Nginx -> Gateway / YARP -> Upload -> private MinIO source object
                                   `-> rebuildable Redis counts and membership
 ```
 
-The Web application, Gateway, Upload service, and Feed service are separate build
-and container units. Only the Gateway exposes backend API contracts to the browser.
+The Web application and every backend boundary, including Search, are separate
+build and container units. Only the Gateway exposes backend API contracts to the browser.
 Feed returns signed URLs that let the browser read private renditions directly
 from object storage without proxying media bytes. Upload owns the
-private source bucket and temporarily owns ingestion metadata. Future catalog or
-search metadata remains a separate boundary and must integrate through contracts,
-not by reading Upload's database or mounting its storage.
+private source bucket and temporarily owns ingestion metadata. Catalog ownership
+remains proposed; Search receives its projection through contracts rather than
+reading Upload or Feed databases or mounting their storage.
 
 Transcoding reads source coordinates from the versioned event, stores its own
 durable job state in the `transcoding` PostgreSQL schema, and writes only to its
@@ -51,6 +56,11 @@ descriptive metadata to rendition coordinates in the `feed` PostgreSQL schema,
 and exposes only complete projections. Either event may arrive first. Retained
 Kafka history bootstraps existing videos; Feed never scans object storage or reads
 another service's schema.
+
+When the join first becomes complete, Feed commits the projection change,
+source-message receipt, and search-index outbox row in one transaction. The
+outbox publisher sends `VideoSearchIndexRequestedV1` asynchronously, so search
+lag cannot block feed availability or playback.
 
 An upload is accepted only after MinIO and the PostgreSQL video/outbox transaction
 are durable. Kafka publication happens later and is at-least-once. The publisher
@@ -69,6 +79,7 @@ uses the video ID as the Kafka key; future consumers must deduplicate by event I
 | Transcoding | Durable job state, retries, FFmpeg probing, and MP4 renditions |
 | Playback | V2 HLS projection, strict manifest rewriting, and signed private segment delivery |
 | Engagement | Reactions, comments, qualified visible views, Kafka consumers, and Redis projections |
+| Search | Elasticsearch video projection, durable index consumption, and prefix-aware suggestions |
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |
 
@@ -90,3 +101,7 @@ See [ADR 0006](decisions/0006-session-authentication.md).
 The watch route obtains canonical video metadata from Feed, public usernames from
 Identity, and reactions, comments, and visible counts from Engagement. See
 [ADR 0007](decisions/0007-engagement-projections.md).
+
+Search consumes only Feed-owned `VideoSearchIndexRequestedV1` events. It uses
+stable video IDs plus monotonic revisions and never queries Feed PostgreSQL. See
+[ADR 0008](decisions/0008-durable-elasticsearch-video-search.md).

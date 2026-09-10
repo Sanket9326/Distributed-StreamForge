@@ -29,7 +29,7 @@ with .NET microservices that handle accounts, uploads, processing, and engagemen
 | --- | --- | --- |
 | 📤 | **Upload** | Sign in and upload MP4, MOV, WebM, or MKV videos up to 1 GB. |
 | ▶️ | **Watch** | Stream with automatic or manual quality selection, up to 1080p when the source supports it, with MP4 fallback. |
-| 🧭 | **Discover** | Browse ready videos and find more to watch in the recommendations sidebar. |
+| 🧭 | **Discover** | Search ready videos as you type, browse the feed, and find recommendations. |
 | 💬 | **Interact** | Like or dislike, post and manage your comments, and see view counts. |
 | 🔗 | **Share** | Copy a stable watch-page link with the creator's public name on display. |
 
@@ -51,8 +51,8 @@ flowchart LR
 **Under the hood:** YARP routes API requests to the .NET services. Kafka carries
 background events, FFmpeg prepares video qualities, and MinIO stores private
 media served through signed URLs. PostgreSQL stores durable data; Redis handles
-login sessions and engagement counters. HLS adapts playback quality as bandwidth
-changes.
+login sessions and engagement counters; Elasticsearch powers live video
+suggestions. HLS adapts playback quality as bandwidth changes.
 
 ## Get started
 

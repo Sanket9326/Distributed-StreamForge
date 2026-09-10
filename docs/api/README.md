@@ -8,6 +8,8 @@ See [authentication contracts](authentication.md) for registration, login, logou
 session cookies, antiforgery headers, rate limits, and authentication errors.
 See [engagement contracts](engagement.md) for reactions, qualified views, comments,
 public profiles, and stable watch-page video lookup.
+See [search contracts](search.md) for suggestions, the Feed-to-Search event,
+revision handling, and the indexing dead-letter topic.
 
 ## Upload a video
 
@@ -228,6 +230,7 @@ JSON success response and Problem Details body also contain that identifier.
 - Transcoding worker: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Feed service: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Engagement service: `GET /health/live`, `GET /health/ready`, and `GET /health`
+- Search service: `GET /health/live`, `GET /health/ready`, and `GET /health`
 - Web container: `GET /health`
 
 Gateway and Upload health endpoints are internal-only in the Compose topology.

@@ -3,17 +3,20 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { UploadCompletionService } from './upload-completion.service';
 import { AuthService } from './auth/auth.service';
 import { Router } from '@angular/router';
+import { VideoSearchComponent } from './search/video-search.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, VideoSearchComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })
 export class App {
   protected readonly completions = inject(UploadCompletionService);
   protected readonly auth = inject(AuthService);
-  protected readonly sidebarCollapsed = signal(localStorage.getItem('streamforge-sidebar-collapsed') === '1');
+  protected readonly sidebarCollapsed = signal(
+    localStorage.getItem('streamforge-sidebar-collapsed') === '1',
+  );
   private readonly router = inject(Router);
 
   constructor() {

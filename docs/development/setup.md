@@ -74,6 +74,10 @@ Before starting Engagement outside Compose, supply
 `Kafka__BootstrapServers`, and `Feed__BaseAddress`. Engagement creates its two
 output topics and consumes the completed-video topic.
 
+Before starting Search outside Compose, supply `Elasticsearch__Endpoint` and
+`Kafka__BootstrapServers`. Elasticsearch, `video-search-index`, and Kafka must
+already be reachable; Search creates only `video-search-index-dead-letter`.
+
 ```powershell
 dotnet run --project src/backend/services/upload/StreamForge.Upload.Api.csproj
 ```
@@ -91,6 +95,10 @@ dotnet run --project src/backend/services/engagement/StreamForge.Engagement.Api.
 ```
 
 ```powershell
+dotnet run --project src/backend/services/search/StreamForge.Search.Api.csproj
+```
+
+```powershell
 dotnet run --project src/backend/gateway/StreamForge.Gateway.Api.csproj
 ```
 
@@ -100,9 +108,9 @@ npm start
 ```
 
 Open `https://localhost:4200`. The Angular development proxy sends `/api` requests
-to the Gateway on port 5080; Identity listens on port 5084 and Engagement on
-port 5085; the Gateway sends upload requests to Upload on port 5081 and feed
-requests to Feed on port 5082.
+to the Gateway on port 5080; Identity listens on port 5084, Engagement on port
+5085, and Search on port 5086; the Gateway sends upload requests to Upload on
+port 5081 and feed requests to Feed on port 5082.
 
 ## Run with Docker
 
@@ -136,7 +144,7 @@ To view Upload metadata in pgAdmin, choose **Add New Server** and use:
 
 Use `postgres`, not `localhost`, because pgAdmin runs inside the Compose network.
 The Gateway, Upload service, Transcoding worker, Feed service, database port,
-Identity, Redis, and Kafka remain private. The Web UI, administration consoles,
+Identity, Search, Elasticsearch, Redis, and Kafka remain private. The Web UI, administration consoles,
 and HTTPS media edge publish host ports; the rendition bucket remains private and requires signed URLs. Upload
 applies committed EF Core migrations, creates the private MinIO bucket if absent,
 and creates `video-processing` only if absent before becoming ready.
@@ -144,6 +152,9 @@ Transcoding then creates `streamforge-renditions` and its completed, failed, and
 dead-letter topics if absent. Feed applies its own schema migration, verifies
 those topics and the rendition bucket, and replays retained events from the
 earliest offset for its new consumer group.
+Feed also creates `video-search-index` and durably publishes ready-video events
+from its transactional outbox. Search creates the dead-letter topic and the
+versioned Elasticsearch index plus read/write aliases before becoming ready.
 
 Stop containers while preserving objects, database rows, and Kafka logs:
 
@@ -170,6 +181,7 @@ docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 | pgAdmin | Login password | Value of `STREAMFORGE_POSTGRES_PASSWORD` |
 | Gateway | `ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address` | `http://localhost:5081/` |
 | Gateway | `ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address` | `http://localhost:5082/` |
+| Gateway | `ReverseProxy:Clusters:search-cluster:Destinations:search-service:Address` | `http://localhost:5086/` |
 | Upload | `ConnectionStrings:UploadDatabase` | Required |
 | Upload | `Upload:MaxFileSizeBytes` | `1073741824` |
 | Upload | `ObjectStorage:Endpoint` | Required |
@@ -197,6 +209,8 @@ docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 | Feed | `ConnectionStrings:FeedDatabase` | Required; local Compose shares PostgreSQL with an isolated `feed` schema |
 | Feed | `Kafka:ConsumerGroupId` | `streamforge-feed-v1` |
 | Feed | `Kafka:UploadedTopic` / `CompletedTopic` | `video-processing` / `video-transcoding-completed` |
+| Feed | `Kafka:SearchIndexTopic` | `video-search-index` |
+| Feed | `Outbox:PollIntervalMilliseconds` / `BatchSize` | `1000` / `20` |
 | Feed | `ObjectStorage:Endpoint` | Required internal S3-compatible endpoint |
 | Feed | `ObjectStorage:PublicEndpoint` | Required browser-visible signing endpoint |
 | Feed | `ObjectStorage:RenditionsBucket` | `streamforge-renditions` |
@@ -208,6 +222,11 @@ docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 | Playback | `ConnectionStrings:PlaybackDatabase` | Required; isolated `playback` schema |
 | Playback | `Kafka:ConsumerGroupId` | `streamforge-playback-v1` |
 | Playback | `Playback:SignedUrlExpirySeconds` | `3600` |
+| Search | `Elasticsearch:Endpoint` | Required; Compose uses `http://elasticsearch:9200` |
+| Search | `Elasticsearch:IndexName` | `streamforge-videos-v1` |
+| Search | `Elasticsearch:ReadAlias` / `WriteAlias` | `streamforge-videos-read` / `streamforge-videos-write` |
+| Search | `Kafka:ConsumerGroupId` | `streamforge-search-index-v1` |
+| Search | `Kafka:InputTopic` / `DeadLetterTopic` | `video-search-index` / `video-search-index-dead-letter` |
 | Transcoding | `Transcoding:HlsSegmentDurationSeconds` / `AssetUploadConcurrency` | `4` / `4` |
 
 Compose restricts MinIO's cluster-wide CORS origins to

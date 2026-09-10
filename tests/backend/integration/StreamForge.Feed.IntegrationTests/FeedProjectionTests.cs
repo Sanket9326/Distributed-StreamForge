@@ -1,11 +1,13 @@
 using System.Text.Json;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Data.Common;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Images;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Minio;
@@ -100,6 +102,41 @@ public sealed class FeedProjectionTests : IAsyncLifetime
         await AssertSignedRangePlaybackAsync();
     }
 
+    [Fact]
+    public async Task CompletionCommitFailure_RollsBackVideoReceiptAndSearchOutboxTogether()
+    {
+        var videoId = Guid.NewGuid();
+        var uploadedAt = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var uploaded = new VideoUploadedV1(
+            Guid.NewGuid(), VideoUploadedV1.Type, 1, uploadedAt, videoId,
+            "streamforge-videos", $"sources/{videoId:N}.mp4", "source-etag", "demo.mp4",
+            "video/mp4", 100, "Rollback", "Description", ["video"], null,
+            uploadedAt, "correlation");
+        var projector = CreateProjector(contextFactory);
+        await projector.ProjectAsync(Envelope("video-processing", uploaded), CancellationToken.None);
+
+        var failingOptions = new DbContextOptionsBuilder<FeedDbContext>()
+            .UseNpgsql(postgres.GetConnectionString(), npgsql =>
+                npgsql.MigrationsHistoryTable("__ef_migrations_history", FeedDbContext.Schema))
+            .AddInterceptors(new FailCommitInterceptor())
+            .Options;
+        var failingProjector = CreateProjector(new PooledDbContextFactory<FeedDbContext>(failingOptions));
+        var completion = new VideoTranscodingCompletedV1(
+            Guid.NewGuid(), VideoTranscodingCompletedV1.Type, 1, DateTimeOffset.UtcNow,
+            Guid.NewGuid(), videoId, "streamforge-videos", $"sources/{videoId:N}.mp4",
+            "source-etag", [Rendition(videoId, "480p", 854, 480)], "correlation");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failingProjector.ProjectAsync(
+            Envelope("video-transcoding-completed", completion), CancellationToken.None));
+
+        await using var dbContext = await contextFactory.CreateDbContextAsync();
+        var video = await dbContext.Videos.SingleAsync(candidate => candidate.Id == videoId);
+        Assert.False(video.HasCompletion);
+        Assert.Empty(dbContext.OutboxMessages);
+        Assert.DoesNotContain(await dbContext.ConsumedMessages.ToListAsync(),
+            message => message.EventId == completion.EventId);
+    }
+
     private static async Task ProjectVideoAsync(
         FeedEventProjector projector,
         Guid videoId,
@@ -121,6 +158,13 @@ public sealed class FeedProjectionTests : IAsyncLifetime
             Envelope("video-transcoding-completed", completed),
             CancellationToken.None);
     }
+
+    private static FeedEventProjector CreateProjector(IDbContextFactory<FeedDbContext> factory) => new(
+        factory,
+        Options.Create(new KafkaOptions()),
+        Options.Create(new ObjectStorageOptions()),
+        TimeProvider.System,
+        NullLogger<FeedEventProjector>.Instance);
 
     private static RenditionV1 Rendition(Guid videoId, string tier, int width, int height) => new(
         tier, width, height, "h264", "aac", "video/mp4", "streamforge-renditions",
@@ -197,5 +241,17 @@ public sealed class FeedProjectionTests : IAsyncLifetime
             CancellationToken cancellationToken) => Task.FromResult(new SignedPlaybackUrl(
                 $"https://storage.test/{rendition.ObjectKey}",
                 DateTimeOffset.UtcNow.AddHours(1)));
+    }
+
+
+    private sealed class FailCommitInterceptor : DbTransactionInterceptor
+    {
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromException<InterceptionResult>(
+                new InvalidOperationException("Injected transaction commit failure."));
     }
 }

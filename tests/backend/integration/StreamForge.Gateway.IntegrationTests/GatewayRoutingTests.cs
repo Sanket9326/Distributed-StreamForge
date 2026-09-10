@@ -86,6 +86,20 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task SearchRoute_ForwardsQueryAnonymouslyWithoutCookies()
+    {
+        using var client = await factory.AuthenticatedClientAsync();
+
+        using var response = await client.GetAsync("/api/search/videos/suggestions?q=search&limit=8");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<SearchDownstreamResponse>();
+        Assert.Equal("search", result?.Query);
+        Assert.Equal(string.Empty, result?.Cookie);
+        Assert.False(string.IsNullOrWhiteSpace(result?.CorrelationId));
+    }
+
+    [Fact]
     public async Task UnknownRoute_ReturnsNotFound()
     {
         using var client = factory.CreateClient();
@@ -129,4 +143,10 @@ public sealed class GatewayRoutingTests(GatewayApiFactory factory) : IClassFixtu
     private sealed record DownstreamResponse(long ReceivedBytes, string CorrelationId);
 
     private sealed record FeedDownstreamResponse(object[] Items, string? NextCursor, string CorrelationId);
+
+    private sealed record SearchDownstreamResponse(
+        object[] Items,
+        string Query,
+        string Cookie,
+        string CorrelationId);
 }

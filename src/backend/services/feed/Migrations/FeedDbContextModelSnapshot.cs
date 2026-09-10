@@ -169,6 +169,10 @@ namespace StreamForge.Feed.Api.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
+                    b.Property<long>("SearchRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("search_revision");
+
                     b.Property<string>("SortKey")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
@@ -198,6 +202,81 @@ namespace StreamForge.Feed.Api.Migrations
                         .HasDatabaseName("ix_videos_ready_feed");
 
                     b.ToTable("videos", "feed");
+                });
+
+            modelBuilder.Entity("StreamForge.Feed.Api.Data.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at_utc");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("PartitionKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("partition_key");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at_utc");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(249)
+                        .HasColumnType("character varying(249)")
+                        .HasColumnName("topic");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("type");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("video_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_outbox_messages");
+
+                    b.HasIndex("ProcessedAtUtc", "NextAttemptAtUtc")
+                        .HasDatabaseName("ix_outbox_messages_pending");
+
+                    b.HasIndex("VideoId", "Revision")
+                        .IsUnique()
+                        .HasDatabaseName("ux_outbox_messages_video_revision");
+
+                    b.ToTable("outbox_messages", "feed");
                 });
 
             modelBuilder.Entity("StreamForge.Feed.Api.Data.Entities.FeedRendition", b =>

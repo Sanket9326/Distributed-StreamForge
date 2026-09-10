@@ -144,3 +144,27 @@ manifest once for fresh signatures and then falls back to a Feed-signed MP4.
 
 See [authentication operations](authentication.md) for HTTPS certificates, sessions,
 Redis outages, rate limits, proxy trust and Gateway key persistence.
+
+## Search suggestions are missing or unavailable
+
+Search freshness is isolated from uploads, transcoding, Feed, and playback.
+Inspect the Search, Elasticsearch, Feed, and Kafka services without restarting
+the healthy video pipeline:
+
+```powershell
+docker compose -f infra/docker/compose.yml ps
+docker compose -f infra/docker/compose.yml logs search-service elasticsearch feed-service kafka
+```
+
+Feed stores pending search publication intents in `feed.outbox_messages`. A row
+with a null `processed_at_utc` is retried indefinitely with bounded backoff. The
+Search consumer commits a `video-search-index` offset only after Elasticsearch
+accepts the versioned write or Kafka acknowledges the corresponding
+`video-search-index-dead-letter` message.
+
+Connectivity failures, timeouts, `429`, and `5xx` leave the offset uncommitted.
+Malformed contracts and permanent mapping errors increment
+`search.indexing.failures`, are logged with their source location, and enter the
+DLQ. V1 has no automatic replay: inspect and correct the producer or mapping,
+then explicitly republish a corrected index request rather than editing
+Elasticsearch documents by hand.
