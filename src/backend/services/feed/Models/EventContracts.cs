@@ -60,3 +60,23 @@ public sealed record VideoTranscodingCompletedV2(Guid EventId,string EventType,i
 {
     public const string Type="video.transcoding.completed"; public const int Version=2;
 }
+
+public sealed record VideoSearchIndexRequestedV1(
+    Guid EventId,
+    string EventType,
+    int EventVersion,
+    DateTimeOffset OccurredAtUtc,
+    Guid CausationEventId,
+    string CorrelationId,
+    Guid VideoId,
+    long Revision,
+    Guid? OwnerId,
+    string Title,
+    string? Description,
+    IReadOnlyList<string> Hashtags,
+    DateTimeOffset UploadedAtUtc,
+    DateTimeOffset AvailableAtUtc)
+{
+    public const string Type = "video.search.index-requested";
+    public const int Version = 1;
+}

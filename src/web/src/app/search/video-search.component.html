@@ -1,0 +1,52 @@
+<button
+  class="mobile-search-toggle"
+  type="button"
+  aria-label="Search videos"
+  [attr.aria-expanded]="mobileOpen()"
+  (click)="toggleMobile()"
+>
+  <span aria-hidden="true"></span>
+</button>
+
+<form
+  class="search-form"
+  [class.mobile-open]="mobileOpen()"
+  role="search"
+  (submit)="submit($event)"
+>
+  <label class="sr-only" for="site-search">Search videos</label>
+  <input
+    #searchInput
+    id="site-search"
+    type="search"
+    placeholder="Search videos"
+    autocomplete="off"
+    [formControl]="searchControl"
+    (focus)="focused.set(true)"
+  />
+  <button class="submit-search" type="submit" aria-label="Open first search suggestion">
+    <span aria-hidden="true"></span>
+  </button>
+</form>
+
+@if (showPanel()) {
+  <section class="suggestions" aria-label="Video suggestions" aria-live="polite">
+    @if (failed()) {
+      <p role="alert">Search is temporarily unavailable.</p>
+    } @else {
+      @for (suggestion of suggestions(); track suggestion.videoId) {
+        <button type="button" (click)="open(suggestion)">
+          <span class="suggestion-icon" aria-hidden="true">⌕</span>
+          <span>
+            <strong>{{ suggestion.title }}</strong>
+            @if (suggestion.hashtags.length > 0) {
+              <small>#{{ suggestion.hashtags.join(' #') }}</small>
+            } @else if (suggestion.description) {
+              <small>{{ suggestion.description }}</small>
+            }
+          </span>
+        </button>
+      }
+    }
+  </section>
+}

@@ -12,5 +12,11 @@ public sealed class KafkaOptions
 
     public string CompletedTopic { get; init; } = "video-transcoding-completed";
 
+    public string SearchIndexTopic { get; init; } = "video-search-index";
+
+    public int PartitionCount { get; init; } = 1;
+
+    public short ReplicationFactor { get; init; } = 1;
+
     public int InitializationTimeoutSeconds { get; init; } = 60;
 }

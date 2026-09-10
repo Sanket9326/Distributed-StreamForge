@@ -5,6 +5,7 @@
     <Project Path="src/backend/gateway/StreamForge.Gateway.Api.csproj" />
     <Project Path="src/backend/services/feed/StreamForge.Feed.Api.csproj" />
     <Project Path="src/backend/services/playback/StreamForge.Playback.Api.csproj" />
+    <Project Path="src/backend/services/search/StreamForge.Search.Api.csproj" />
     <Project Path="src/backend/services/upload/StreamForge.Upload.Api.csproj" />
     <Project Path="src/backend/workers/transcoding/StreamForge.Transcoding.Worker.csproj" />
   </Folder>
@@ -12,6 +13,7 @@
     <Project Path="tests/backend/integration/StreamForge.Engagement.IntegrationTests/StreamForge.Engagement.IntegrationTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Engagement.UnitTests/StreamForge.Engagement.UnitTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Identity.IntegrationTests/StreamForge.Identity.IntegrationTests.csproj" />
+    <Project Path="tests/backend/integration/StreamForge.Search.IntegrationTests/StreamForge.Search.IntegrationTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Identity.UnitTests/StreamForge.Identity.UnitTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Feed.IntegrationTests/StreamForge.Feed.IntegrationTests.csproj" />
     <Project Path="tests/backend/integration/StreamForge.Gateway.IntegrationTests/StreamForge.Gateway.IntegrationTests.csproj" />
@@ -19,6 +21,7 @@
     <Project Path="tests/backend/integration/StreamForge.Upload.IntegrationTests/StreamForge.Upload.IntegrationTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Feed.UnitTests/StreamForge.Feed.UnitTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Playback.UnitTests/StreamForge.Playback.UnitTests.csproj" />
+    <Project Path="tests/backend/unit/StreamForge.Search.UnitTests/StreamForge.Search.UnitTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Upload.UnitTests/StreamForge.Upload.UnitTests.csproj" />
     <Project Path="tests/backend/unit/StreamForge.Transcoding.UnitTests/StreamForge.Transcoding.UnitTests.csproj" />
   </Folder>

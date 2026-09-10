@@ -85,6 +85,17 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
             }).ExecuteAsync(context);
         });
 
+        downstream.MapGet("/api/search/videos/suggestions", async context =>
+        {
+            await Results.Json(new
+            {
+                items = new[] { new { videoId = UserId, title = "Search result" } },
+                query = context.Request.Query["q"].ToString(),
+                cookie = context.Request.Headers.Cookie.ToString(),
+                correlationId = context.Request.Headers["X-Correlation-ID"].ToString()
+            }).ExecuteAsync(context);
+        });
+
         downstream.MapGet("/api/feed/videos/{videoId:guid}/completion-events", async context =>
         {
             context.Response.ContentType = "text/event-stream";
@@ -148,6 +159,8 @@ public sealed class GatewayApiFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["ReverseProxy:Clusters:upload-cluster:Destinations:upload-service:Address"] =
                     $"{downstreamAddress}/",
                 ["ReverseProxy:Clusters:feed-cluster:Destinations:feed-service:Address"] =
+                    $"{downstreamAddress}/",
+                ["ReverseProxy:Clusters:search-cluster:Destinations:search-service:Address"] =
                     $"{downstreamAddress}/",
                 ["ReverseProxy:Clusters:playback-cluster:Destinations:playback-service:Address"] =
                     $"{downstreamAddress}/",

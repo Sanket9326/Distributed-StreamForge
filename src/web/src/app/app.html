@@ -1,7 +1,13 @@
 <div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed()">
   <header class="topbar">
     <div class="topbar-start">
-      <button class="icon-button menu-button" type="button" [attr.aria-label]="sidebarCollapsed() ? 'Expand navigation' : 'Collapse navigation'" [attr.aria-expanded]="!sidebarCollapsed()" (click)="toggleSidebar()">
+      <button
+        class="icon-button menu-button"
+        type="button"
+        [attr.aria-label]="sidebarCollapsed() ? 'Expand navigation' : 'Collapse navigation'"
+        [attr.aria-expanded]="!sidebarCollapsed()"
+        (click)="toggleSidebar()"
+      >
         <span></span><span></span><span></span>
       </button>
       <a class="brand" routerLink="/" aria-label="StreamForge home">
@@ -10,20 +16,20 @@
       </a>
     </div>
 
-    <form class="search" role="search" aria-disabled="true" title="Search is coming soon" (submit)="$event.preventDefault()">
-      <label class="sr-only" for="site-search">Search videos</label>
-      <input id="site-search" type="search" placeholder="Search · coming soon" autocomplete="off" disabled />
-      <button type="submit" aria-label="Search" disabled><span aria-hidden="true"></span></button>
-    </form>
+    <app-video-search />
 
     <div class="topbar-actions">
-      <button class="icon-button mobile-search-button" type="button" aria-label="Search videos · coming soon" disabled title="Coming soon">
-        <span aria-hidden="true"></span>
-      </button>
       <a class="create-button" routerLink="/upload">
-        <span aria-hidden="true">＋</span><span class="create-label">Create</span>
+        <span class="create-icon" aria-hidden="true">＋</span>
+        <span class="create-label">Create</span>
       </a>
-      <button class="icon-button notification-button" type="button" aria-label="Notifications · coming soon" disabled title="Coming soon">
+      <button
+        class="icon-button notification-button"
+        type="button"
+        aria-label="Notifications · coming soon"
+        disabled
+        title="Coming soon"
+      >
         <span aria-hidden="true">♢</span><i></i>
       </button>
       @if (auth.user(); as user) {

@@ -12,6 +12,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0005: Adaptive HLS packaging and private direct delivery](0005-adaptive-hls-playback.md)
 - [0006: Identity-owned accounts and Redis browser sessions](0006-session-authentication.md)
 - [0007: Engagement-owned reactions, comments, and visible views](0007-engagement-projections.md)
+- [0008: Durable Elasticsearch video search](0008-durable-elasticsearch-video-search.md)
 
 ```markdown
 # NNNN: Decision title

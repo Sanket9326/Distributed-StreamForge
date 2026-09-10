@@ -35,6 +35,7 @@ services:
       ReverseProxy__Clusters__identity-cluster__Destinations__identity-service__Address: http://identity-service:8080/
       ReverseProxy__Clusters__upload-cluster__Destinations__upload-service__Address: http://upload-service:8080/
       ReverseProxy__Clusters__feed-cluster__Destinations__feed-service__Address: http://feed-service:8080/
+      ReverseProxy__Clusters__search-cluster__Destinations__search-service__Address: http://search-service:8080/
       ReverseProxy__Clusters__playback-cluster__Destinations__playback-service__Address: http://playback-service:8080/
       ReverseProxy__Clusters__engagement-cluster__Destinations__engagement-service__Address: http://engagement-service:8080/
     expose:
@@ -166,6 +167,37 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  search-service:
+    build:
+      context: ../../src/backend/services/search
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Elasticsearch__Endpoint: http://elasticsearch:9200
+      Elasticsearch__IndexName: streamforge-videos-v1
+      Elasticsearch__ReadAlias: streamforge-videos-read
+      Elasticsearch__WriteAlias: streamforge-videos-write
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__ConsumerGroupId: streamforge-search-index-v1
+      Kafka__InputTopic: video-search-index
+      Kafka__DeadLetterTopic: video-search-index-dead-letter
+      Kafka__PartitionCount: "1"
+      Kafka__ReplicationFactor: "1"
+    expose: ["8080"]
+    depends_on:
+      feed-service:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
   feed-service:
     build:
       context: ../../src/backend/services/feed
@@ -176,6 +208,9 @@ services:
       Kafka__ConsumerGroupId: streamforge-feed-v1
       Kafka__UploadedTopic: video-processing
       Kafka__CompletedTopic: video-transcoding-completed
+      Kafka__SearchIndexTopic: video-search-index
+      Kafka__PartitionCount: "1"
+      Kafka__ReplicationFactor: "1"
       ObjectStorage__Endpoint: minio:9000
       ObjectStorage__PublicEndpoint: localhost:9443
       ObjectStorage__AccessKey: ${STREAMFORGE_MINIO_ACCESS_KEY:?Copy .env.example to .env}
@@ -295,6 +330,25 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    expose: ["9200"]
+    mem_limit: 1g
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: unless-stopped
+
   pgadmin:
     image: dpage/pgadmin4:9.17
     environment:
@@ -370,3 +424,4 @@ volumes:
   pgadmin-data:
   minio-data:
   kafka-data:
+  elasticsearch-data:

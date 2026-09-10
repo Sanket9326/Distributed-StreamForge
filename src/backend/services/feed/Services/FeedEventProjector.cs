@@ -59,13 +59,14 @@ public sealed class FeedEventProjector(
         }
 
         ProjectionResult result = ProjectionResult.None;
+        FeedVideo? video = null;
         if (parsed.Uploaded is not null)
         {
-            await ApplyUploadedAsync(dbContext, parsed.Uploaded, cancellationToken);
+            video = await ApplyUploadedAsync(dbContext, parsed.Uploaded, cancellationToken);
         }
         else if (parsed.Completed is not null)
         {
-            await ApplyCompletedAsync(dbContext, parsed.Completed, cancellationToken);
+            video = await ApplyCompletedAsync(dbContext, parsed.Completed, cancellationToken);
             result = ProjectionResult.Completed(parsed.Completed.VideoId, parsed.Completed.OccurredAtUtc);
         }
         else
@@ -78,6 +79,27 @@ public sealed class FeedEventProjector(
                 parsed.RejectionCode);
         }
 
+        if (video is { HasMetadata: true, HasCompletion: true, SearchRevision: 0 })
+        {
+            video.SearchRevision = 1;
+            var requested = new VideoSearchIndexRequestedV1(
+                Guid.NewGuid(),
+                VideoSearchIndexRequestedV1.Type,
+                VideoSearchIndexRequestedV1.Version,
+                timeProvider.GetUtcNow(),
+                parsed.EventId!.Value,
+                parsed.CorrelationId!,
+                video.Id,
+                video.SearchRevision,
+                video.OwnerId,
+                video.Title!,
+                video.Description,
+                video.Hashtags,
+                video.UploadedAtUtc!.Value,
+                video.AvailableAtUtc!.Value);
+            dbContext.OutboxMessages.Add(SearchIndexOutboxFactory.Create(requested, topics.SearchIndexTopic));
+        }
+
         dbContext.ConsumedMessages.Add(CreateConsumed(
             envelope,
             parsed.EventId,
@@ -87,7 +109,7 @@ public sealed class FeedEventProjector(
         return result;
     }
 
-    private async Task ApplyUploadedAsync(
+    private async Task<FeedVideo> ApplyUploadedAsync(
         FeedDbContext dbContext,
         VideoUploadedV1 uploaded,
         CancellationToken cancellationToken)
@@ -113,9 +135,10 @@ public sealed class FeedEventProjector(
         video.UploadedAtUtc = uploaded.UploadedAtUtc;
         video.HasMetadata = true;
         video.UpdatedAtUtc = now;
+        return video;
     }
 
-    private async Task ApplyCompletedAsync(
+    private async Task<FeedVideo> ApplyCompletedAsync(
         FeedDbContext dbContext,
         VideoTranscodingCompletedV1 completed,
         CancellationToken cancellationToken)
@@ -157,6 +180,7 @@ public sealed class FeedEventProjector(
             Etag = rendition.Etag.Trim('"'),
             SizeBytes = rendition.SizeBytes
         }).ToList();
+        return video;
     }
 
     private ParsedEvent Parse(ConsumedEnvelope envelope)
@@ -167,7 +191,7 @@ public sealed class FeedEventProjector(
             {
                 var uploaded = JsonSerializer.Deserialize<VideoUploadedV1>(envelope.Payload, SerializerOptions);
                 return Validate(uploaded)
-                    ? new ParsedEvent(uploaded!.EventId, uploaded, null, null)
+                    ? new ParsedEvent(uploaded!.EventId, uploaded.CorrelationId, uploaded, null, null)
                     : ParsedEvent.Rejected(uploaded?.EventId, "invalid_uploaded_event");
             }
 
@@ -178,14 +202,14 @@ public sealed class FeedEventProjector(
                 if (version == 1)
                 {
                     var completed = JsonSerializer.Deserialize<VideoTranscodingCompletedV1>(envelope.Payload, SerializerOptions);
-                    return Validate(completed) ? new ParsedEvent(completed!.EventId, null, completed, null) : ParsedEvent.Rejected(completed?.EventId, "invalid_completed_event");
+                    return Validate(completed) ? new ParsedEvent(completed!.EventId, completed.CorrelationId, null, completed, null) : ParsedEvent.Rejected(completed?.EventId, "invalid_completed_event");
                 }
                 if (version == 2)
                 {
                     var completedV2 = JsonSerializer.Deserialize<VideoTranscodingCompletedV2>(envelope.Payload, SerializerOptions);
                     if (!Validate(completedV2)) return ParsedEvent.Rejected(completedV2?.EventId, "invalid_completed_event");
                     var compatible = new VideoTranscodingCompletedV1(completedV2!.EventId,completedV2.EventType,2,completedV2.OccurredAtUtc,completedV2.CausationEventId,completedV2.VideoId,completedV2.SourceBucket,completedV2.SourceObjectKey,completedV2.SourceEtag,completedV2.Renditions,completedV2.CorrelationId);
-                    return new ParsedEvent(compatible.EventId,null,compatible,null);
+                    return new ParsedEvent(compatible.EventId,compatible.CorrelationId,null,compatible,null);
                 }
                 return ParsedEvent.Rejected(null, "unsupported_completed_version");
             }
@@ -260,11 +284,12 @@ public sealed class FeedEventProjector(
 
     private sealed record ParsedEvent(
         Guid? EventId,
+        string? CorrelationId,
         VideoUploadedV1? Uploaded,
         VideoTranscodingCompletedV1? Completed,
         string? RejectionCode)
     {
         public static ParsedEvent Rejected(Guid? eventId, string rejectionCode) =>
-            new(eventId, null, null, rejectionCode);
+            new(eventId, null, null, null, rejectionCode);
     }
 }

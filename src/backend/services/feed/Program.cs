@@ -19,8 +19,17 @@ builder.Services.AddOptions<KafkaOptions>()
     .Validate(options => !string.IsNullOrWhiteSpace(options.ConsumerGroupId), "ConsumerGroupId is required.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.UploadedTopic), "UploadedTopic is required.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.CompletedTopic), "CompletedTopic is required.")
+    .Validate(options => !string.IsNullOrWhiteSpace(options.SearchIndexTopic), "SearchIndexTopic is required.")
     .Validate(options => options.UploadedTopic != options.CompletedTopic, "Feed topics must be distinct.")
+    .Validate(options => options.PartitionCount > 0, "PartitionCount must be positive.")
+    .Validate(options => options.ReplicationFactor > 0, "ReplicationFactor must be positive.")
     .Validate(options => options.InitializationTimeoutSeconds > 0, "InitializationTimeoutSeconds must be positive.")
+    .ValidateOnStart();
+builder.Services.AddOptions<OutboxOptions>()
+    .BindConfiguration(OutboxOptions.SectionName)
+    .Validate(options => options.PollIntervalMilliseconds > 0, "PollIntervalMilliseconds must be positive.")
+    .Validate(options => options.BatchSize > 0, "BatchSize must be positive.")
+    .Validate(options => options.MaximumRetryDelaySeconds > 0, "MaximumRetryDelaySeconds must be positive.")
     .ValidateOnStart();
 builder.Services.AddOptions<ObjectStorageOptions>()
     .BindConfiguration(ObjectStorageOptions.SectionName)
@@ -49,12 +58,14 @@ builder.Services.AddSingleton<StartupGate>();
 builder.Services.AddSingleton<CompletionNotifier>();
 builder.Services.AddSingleton<FeedCursorCodec>();
 builder.Services.AddSingleton<KafkaTopicManager>();
+builder.Services.AddSingleton<IFeedOutboxPublisher, KafkaOutboxPublisher>();
 builder.Services.AddSingleton<IRenditionStorage, MinioRenditionStorage>();
 builder.Services.AddSingleton<IPlaybackUrlSigner, MinioPlaybackUrlSigner>();
 builder.Services.AddScoped<IFeedEventProjector, FeedEventProjector>();
 builder.Services.AddScoped<FeedQueryService>();
 builder.Services.AddHostedService<InfrastructureInitializer>();
 builder.Services.AddHostedService<KafkaIntakeService>();
+builder.Services.AddHostedService<OutboxPublisherService>();
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
     .AddCheck<DatabaseHealthCheck>("postgresql", tags: ["ready"])
