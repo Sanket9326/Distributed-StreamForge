@@ -20,7 +20,13 @@ public sealed class ElasticsearchSearchTests : IAsyncLifetime
         .WithEnvironment("xpack.security.enrollment.enabled", "false")
         .WithEnvironment("ES_JAVA_OPTS", "-Xms512m -Xmx512m")
         .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request =>
-            request.ForPort(9200).ForPath("/_cluster/health?wait_for_status=yellow")))
+            request.ForPort(9200).ForPath("/_cluster/health")
+                .ForResponseMessageMatching(async response =>
+                {
+                    if (!response.IsSuccessStatusCode) return false;
+                    using var body = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                    return body.RootElement.GetProperty("status").GetString() is "yellow" or "green";
+                }), strategy => strategy.WithTimeout(TimeSpan.FromMinutes(2))))
         .Build();
     private ElasticsearchClient client = null!;
     private ElasticsearchVideoIndex index = null!;
@@ -78,7 +84,7 @@ public sealed class ElasticsearchSearchTests : IAsyncLifetime
     {
         var response = await client.Transport.PostAsync<ElasticsearchStringResponse>(
             "/streamforge-videos-write/_refresh",
-            PostData.String("{}"),
+            PostData.Empty,
             CancellationToken.None);
         Assert.True(response.IsValidResponse, response.DebugInformation);
     }

@@ -11,6 +11,8 @@ import {
   input,
   output,
   signal,
+  effect,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FeedRendition, FeedService, FeedVideo } from './feed.service';
@@ -24,6 +26,7 @@ import {
 import { AuthService } from '../auth/auth.service';
 import { Router } from '@angular/router';
 import { ProfileService } from '../profiles/profile.service';
+import { SubscriptionService } from '../subscriptions/subscription.service';
 
 export interface PlaybackQualityChanged {
   videoId: string;
@@ -82,6 +85,7 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly feedService = inject(FeedService);
   protected readonly auth = inject(AuthService);
+  protected readonly subscriptions = inject(SubscriptionService);
   private readonly engagement = inject(EngagementService);
   private readonly profiles = inject(ProfileService);
   private readonly router = inject(Router);
@@ -97,6 +101,23 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   private viewSubmitted = false;
   private readonly viewSessionId = globalThis.crypto?.randomUUID?.() ??
     `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  constructor() {
+    effect(() => {
+      const owner = this.video().ownerId;
+      const user = this.auth.user();
+      if (this.appearance() === 'watch' && owner && user && owner !== user.id)
+        untracked(() => void this.subscriptions.loadStatus([owner]).catch(() => {
+          this.socialError.set('Subscription status could not be loaded.');
+        }));
+    });
+  }
+
+  protected toggleSubscription(): void {
+    if (!this.auth.user()) { this.goToLogin(); return; }
+    const owner = this.video().ownerId;
+    if (owner) void this.subscriptions.change(owner, !this.subscriptions.state(owner).isActive);
+  }
 
   ngOnInit(): void {
     const summary = this.summary();

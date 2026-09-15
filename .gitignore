@@ -26,6 +26,8 @@ Thumbs.db
 # Generated media and infrastructure state
 artifacts/
 data/
+!src/backend/services/engagement/Data/
+!src/backend/services/engagement/Data/**
 !src/backend/services/identity/Data/
 !src/backend/services/identity/Data/**
 media/

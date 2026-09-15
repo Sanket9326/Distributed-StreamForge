@@ -20,7 +20,7 @@ public sealed class EngagementReadiness(
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
             if (!await dbContext.Database.CanConnectAsync(cancellationToken))
                 return HealthCheckResult.Unhealthy("Engagement database unavailable.");
-            await redis.GetDatabase().PingAsync().WaitAsync(cancellationToken);
+            await new StreamForge.Engagement.Api.Infrastructure.Redis.LuaScriptExecutor(redis).ReadyAsync(cancellationToken);
             await topics.VerifyAvailableAsync(cancellationToken);
             return HealthCheckResult.Healthy();
         }

@@ -58,7 +58,7 @@ public sealed class CommentService(
         dbContext.Comments.Add(comment);
         await dbContext.SaveChangesAsync(cancellationToken);
         var count = await dbContext.Comments.LongCountAsync(x => x.VideoId == videoId, cancellationToken);
-        await TrySetCountAsync(videoId, count);
+        await TryInvalidateCountAsync(videoId);
         return new CommentMutationResponse(Map(comment), count);
     }
 
@@ -92,13 +92,13 @@ public sealed class CommentService(
         dbContext.Comments.Remove(comment);
         await dbContext.SaveChangesAsync(cancellationToken);
         var count = await dbContext.Comments.LongCountAsync(x => x.VideoId == comment.VideoId, cancellationToken);
-        await TrySetCountAsync(comment.VideoId, count);
+        await TryInvalidateCountAsync(comment.VideoId);
         return new CommentDeletedResponse(count);
     }
 
-    private async Task TrySetCountAsync(Guid videoId, long count)
+    private async Task TryInvalidateCountAsync(Guid videoId)
     {
-        try { await cache.SetCommentCountAsync(videoId, count); }
+        try { await cache.InvalidateCommentCountAsync(videoId); }
         catch (RedisException exception) { logger.LogWarning(exception, "Comment count cache update failed for {VideoId}", videoId); }
     }
 

@@ -68,6 +68,12 @@ uses the video ID as the Kafka key; future consumers must deduplicate by event I
 
 ## Boundaries
 
+Subscriptions follow Kafka acceptance -> Lua Redis projection -> transactional
+PostgreSQL consumer -> Redis confirmation. All application Redis access in
+Identity, Gateway and Engagement runs embedded Lua scripts. See
+[ADR 0009](decisions/0009-async-subscriptions-and-lua-redis.md) for ordering,
+rebuilding and session-preserving rollout.
+
 | Boundary | Responsibility |
 | --- | --- |
 | Gateway | Routing, edge authentication, rate limiting, correlation IDs |
@@ -78,7 +84,7 @@ uses the video ID as the Kafka key; future consumers must deduplicate by event I
 | Processing | Proposed future cross-service workflow orchestration |
 | Transcoding | Durable job state, retries, FFmpeg probing, and MP4 renditions |
 | Playback | V2 HLS projection, strict manifest rewriting, and signed private segment delivery |
-| Engagement | Reactions, comments, qualified visible views, Kafka consumers, and Redis projections |
+| Engagement | Reactions, comments, qualified visible views, subscriptions, Kafka consumers, and Lua Redis projections |
 | Search | Elasticsearch video projection, durable index consumption, and prefix-aware suggestions |
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |

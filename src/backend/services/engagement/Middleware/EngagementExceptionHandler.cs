@@ -37,7 +37,7 @@ public sealed class EngagementExceptionHandler(
     {
         if (exception is EngagementRequestException request)
             return (request.StatusCode, request.Title, request.Message, LogLevel.None);
-        if (exception is KafkaException or HttpRequestException || IsDatabaseFailure(exception))
+        if (exception is KafkaException or HttpRequestException or TimeoutException or OperationCanceledException || IsDatabaseFailure(exception))
             return (503, "Engagement temporarily unavailable", "The interaction could not be completed. Retry later.", LogLevel.Error);
         return (500, "Engagement request failed", "The interaction could not be completed.", LogLevel.Error);
     }

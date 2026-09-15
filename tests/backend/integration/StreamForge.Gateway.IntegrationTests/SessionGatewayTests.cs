@@ -7,6 +7,33 @@ namespace StreamForge.Gateway.IntegrationTests;
 public sealed class SessionGatewayTests(GatewayApiFactory factory) : IClassFixture<GatewayApiFactory>
 {
     [Theory]
+    [InlineData("GET", "/api/engagement/subscriptions")]
+    [InlineData("GET", "/api/engagement/subscriptions/subscribers")]
+    [InlineData("GET", "/api/engagement/subscriptions/status")]
+    [InlineData("PUT", "/api/engagement/subscriptions/10000000-0000-0000-0000-000000000001")]
+    [InlineData("DELETE", "/api/engagement/subscriptions/10000000-0000-0000-0000-000000000001")]
+    [InlineData("DELETE", "/api/engagement/subscriptions/subscribers/10000000-0000-0000-0000-000000000001")]
+    public async Task Subscriptions_RequireAuthenticationAndOnlyForwardVerifiedIdentity(string method, string path)
+    {
+        using var anonymous = await factory.AnonymousClientAsync();
+        using var rejected = await anonymous.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+        using var authenticated = await factory.AuthenticatedClientAsync();
+        authenticated.DefaultRequestHeaders.Add("X-StreamForge-User-Id", Guid.NewGuid().ToString());
+        using var accepted = await authenticated.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        var body = await accepted.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        Assert.Equal(GatewayApiFactory.UserId.ToString(), body.GetProperty("userId").GetString());
+        Assert.Equal(string.Empty, body.GetProperty("cookie").GetString());
+        if (method != "GET")
+        {
+            authenticated.DefaultRequestHeaders.Remove("X-XSRF-TOKEN");
+            using var noCsrf = await authenticated.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
+            Assert.Equal(HttpStatusCode.Forbidden, noCsrf.StatusCode);
+        }
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("expired")]
     [InlineData("invalid")]

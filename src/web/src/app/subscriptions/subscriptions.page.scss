@@ -1,0 +1,159 @@
+:host {
+  display: block;
+  color: #f2f1f6;
+}
+.subscriptions-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 36px 28px;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: #aba1d6;
+  font-weight: 700;
+}
+h1 {
+  font-size: clamp(26px, 4vw, 36px);
+  margin: 8px 0;
+  letter-spacing: -0.04em;
+}
+.page-heading p:not(.eyebrow),
+.private-note,
+.person span,
+.empty p {
+  color: #a8a5b6;
+  font-size: 14px;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #444052;
+  border-radius: 20px;
+  padding: 10px 16px;
+  color: #f2f1f6;
+  background: #292633;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+button:hover:not(:disabled) {
+  background: #3b354d;
+}
+button:focus-visible {
+  outline: 2px solid #b49aff;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #302c3d;
+  padding: 24px 0 14px;
+}
+.tabs .selected,
+.subscribe {
+  background: #b49aff;
+  color: #1e1537;
+  border-color: #b49aff;
+}
+.private-note {
+  margin-bottom: 0;
+}
+.feedback {
+  min-height: 1.25em;
+  color: #c7b5fc;
+  font-size: 14px;
+}
+.people {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0;
+  border-bottom: 1px solid #302c3d;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #37304c;
+  color: #d7caff;
+  font-size: 20px;
+}
+.person {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.person strong {
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.error {
+  color: #ffb7b7 !important;
+  font-size: 14px;
+}
+.empty {
+  padding: 64px 16px;
+  text-align: center;
+}
+.empty > span {
+  font-size: 48px;
+  color: #b49aff;
+}
+.empty h2 {
+  font-size: 20px;
+}
+.load-more {
+  display: block;
+  margin: 24px auto;
+}
+.changing {
+  animation: subscription-pulse 0.65s ease-in-out infinite alternate;
+}
+@keyframes subscription-pulse {
+  to {
+    opacity: 0.6;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .changing {
+    animation: none;
+  }
+}
+@media (max-width: 600px) {
+  .subscriptions-page {
+    padding: 24px 16px;
+  }
+  li {
+    flex-wrap: wrap;
+  }
+  .actions {
+    width: 100%;
+    padding-left: 64px;
+  }
+  .page-heading {
+    align-items: flex-start;
+  }
+}

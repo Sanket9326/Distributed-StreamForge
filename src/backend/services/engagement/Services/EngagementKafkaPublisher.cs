@@ -7,7 +7,7 @@ using StreamForge.Engagement.Api.Options;
 
 namespace StreamForge.Engagement.Api.Services;
 
-public sealed class EngagementKafkaPublisher : IDisposable
+public sealed class EngagementKafkaPublisher : IDisposable, ISubscriptionPublisher
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly IProducer<string, string> producer;
@@ -37,6 +37,17 @@ public sealed class EngagementKafkaPublisher : IDisposable
         CancellationToken cancellationToken) =>
         PublishAsync(options.ViewTopic, message.VideoId.ToString("D"), message.EventId,
             message.EventType, message.EventVersion, message, cancellationToken);
+
+    public async Task<SubscriptionDelivery> PublishSubscriptionAsync(UserSubscriptionChangedV1 message, CancellationToken ct)
+    {
+        var delivered = await PublishAsync(options.SubscriptionTopic, message.Key, message.EventId,
+            message.EventType, message.EventVersion, message, ct);
+        return new(delivered.Partition.Value, delivered.Offset.Value);
+    }
+
+    public async Task PublishSubscriptionDeadLetterAsync(SubscriptionDeadLetterV1 message, string key, CancellationToken ct) =>
+        _ = await PublishAsync(options.SubscriptionDeadLetterTopic, key, message.EventId,
+            message.EventType, message.EventVersion, message, ct);
 
     private Task<DeliveryResult<string, string>> PublishAsync<T>(
         string topic,

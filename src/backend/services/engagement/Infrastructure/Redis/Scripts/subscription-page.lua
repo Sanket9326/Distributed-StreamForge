@@ -1,0 +1,18 @@
+#!lua flags=no-writes
+-- @common
+expect(KEYS[1], 'hash'); expect(KEYS[2], 'zset'); expect(KEYS[3], 'string')
+local limit = tonumber(ARGV[1])
+if not limit or limit < 1 or limit > 50 then error('INVALID_LIMIT') end
+if redis.call('GET', KEYS[3]) ~= '1' then return {0, false, {}} end
+local max = ARGV[2] == '' and '+' or '(' .. ARGV[2]
+local members = redis.call('ZREVRANGEBYLEX', KEYS[2], max, '-', 'LIMIT', 0, limit + 1)
+local result = {}; local next = false
+for i = 1, math.min(limit, #members) do
+  local id = string.sub(members[i], 21)
+  id = string.sub(id, 1, 8)..'-'..string.sub(id,9,12)..'-'..string.sub(id,13,16)..'-'..string.sub(id,17,20)..'-'..string.sub(id,21)
+  local state = redis.call('HGET', KEYS[1], id)
+  if not state then error('INCOMPLETE_INDEX') end
+  result[i] = {id, state}
+end
+if #members > limit then next = members[limit] end
+return {1, next, result}

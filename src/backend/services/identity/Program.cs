@@ -73,7 +73,7 @@ public sealed class IdentityReadiness(IServiceScopeFactory scopes, IConnectionMu
             using var scope = scopes.CreateScope();
             if (!await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.CanConnectAsync(cancellationToken))
                 return HealthCheckResult.Unhealthy("Account database unavailable.");
-            await redis.GetDatabase().PingAsync().WaitAsync(cancellationToken);
+            await new StreamForge.Identity.Api.Infrastructure.Redis.LuaScriptExecutor(redis).ReadyAsync(cancellationToken);
             return HealthCheckResult.Healthy();
         }
         catch (Exception exception) when (exception is not OperationCanceledException)

@@ -6,6 +6,9 @@ public sealed class KafkaOptions
     public string BootstrapServers { get; init; } = string.Empty;
     public string ReactionTopic { get; init; } = "video-engagement-reactions";
     public string ViewTopic { get; init; } = "video-engagement-views";
+    public string SubscriptionTopic { get; init; } = "user-engagement-subscriptions";
+    public string SubscriptionDeadLetterTopic { get; init; } = "user-engagement-subscriptions-dead-letter";
+    public string SubscriptionConsumerGroupId { get; init; } = "streamforge-engagement-subscriptions-v1";
     public string CompletedTopic { get; init; } = "video-transcoding-completed";
     public string ReactionConsumerGroupId { get; init; } = "streamforge-engagement-reactions-v1";
     public string ViewConsumerGroupId { get; init; } = "streamforge-engagement-views-v1";

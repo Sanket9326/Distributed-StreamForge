@@ -87,7 +87,15 @@
           <strong>{{ creatorName() }}</strong>
           <small>StreamForge creator</small>
         </div>
-        <button type="button" class="subscribe-button" disabled title="Coming soon">Subscribe</button>
+        @if (video().ownerId; as owner) {
+          @if (owner !== auth.user()?.id) {
+            @let subscription = subscriptions.state(owner);
+            <button class="subscribe-button" type="button" [disabled]="subscription.busy"
+              [attr.aria-pressed]="subscription.isActive" [class.subscription-pending]="subscription.busy"
+              (click)="toggleSubscription()">{{ subscription.isActive ? 'Subscribed' : 'Subscribe' }}</button>
+            @if (subscription.message) { <span role="status" class="social-error">{{ subscription.message }}</span> }
+          }
+        }
       </div>
 
       <div class="video-actions" aria-label="Video actions">

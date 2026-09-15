@@ -1,152 +1,127 @@
+using System.Data;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using StreamForge.Engagement.Api.Data;
+using StreamForge.Engagement.Api.Infrastructure.Redis;
 using StreamForge.Engagement.Api.Models;
 
 namespace StreamForge.Engagement.Api.Services;
 
 public sealed class RedisEngagementProjection(
     IConnectionMultiplexer redis,
-    IDbContextFactory<EngagementDbContext> contextFactory)
+    IDbContextFactory<EngagementDbContext> contextFactory,
+    ILogger<LuaScriptExecutor>? logger = null)
 {
     private const string Prefix = "streamforge:engagement:v1";
-    private static readonly SemaphoreSlim HydrationLock = new(1, 1);
+    private readonly LuaScriptExecutor scripts = new(redis, logger);
 
-    private const string ApplyReactionScript = """
-        local current = redis.call('HGET', KEYS[3], ARGV[1])
-        if current and tonumber(current) > tonumber(ARGV[3]) then
-          return {redis.call('SCARD', KEYS[1]), redis.call('SCARD', KEYS[2])}
-        end
-        redis.call('SREM', KEYS[1], ARGV[1])
-        redis.call('SREM', KEYS[2], ARGV[1])
-        if ARGV[2] == 'like' then redis.call('SADD', KEYS[1], ARGV[1]) end
-        if ARGV[2] == 'dislike' then redis.call('SADD', KEYS[2], ARGV[1]) end
-        redis.call('HSET', KEYS[3], ARGV[1], ARGV[3])
-        redis.call('SET', KEYS[4], '1')
-        return {redis.call('SCARD', KEYS[1]), redis.call('SCARD', KEYS[2])}
-        """;
-
-    private const string IncrementViewScript = """
-        if redis.call('SET', KEYS[1], '1', 'NX', 'EX', ARGV[1]) then
-          return {1, redis.call('INCR', KEYS[2])}
-        end
-        local current = redis.call('GET', KEYS[2]) or '0'
-        return {0, tonumber(current)}
-        """;
-
-    private const string EnsureAtLeastScript = """
-        local current = tonumber(redis.call('GET', KEYS[1]) or '0')
-        local durable = tonumber(ARGV[1])
-        if current < durable then redis.call('SET', KEYS[1], durable); return durable end
-        return current
-        """;
-
-    public async Task<VideoSummaryResponse> GetSummaryAsync(Guid videoId, CancellationToken cancellationToken)
+    public async Task<VideoSummaryResponse> GetSummaryAsync(Guid videoId, CancellationToken ct)
     {
-        await EnsureReactionCacheAsync(videoId, cancellationToken);
-        var database = redis.GetDatabase();
-        var likes = await database.SetLengthAsync(Likes(videoId)).WaitAsync(cancellationToken);
-        var dislikes = await database.SetLengthAsync(Dislikes(videoId)).WaitAsync(cancellationToken);
-        var viewValue = await database.StringGetAsync(Views(videoId)).WaitAsync(cancellationToken);
-        var commentValue = await database.StringGetAsync(Comments(videoId)).WaitAsync(cancellationToken);
-
-        if (viewValue.IsNull || commentValue.IsNull)
+        await EnsureReactionCacheAsync(videoId, ct);
+        var values = (RedisResult[])(await scripts.ExecuteAsync("summary-read",
+            [Likes(videoId), Dislikes(videoId), Views(videoId), Comments(videoId)], [], ct))!;
+        if (values[2].IsNull || values[3].IsNull)
         {
-            await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
-            if (viewValue.IsNull)
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            if (values[2].IsNull)
             {
-                var count = await dbContext.VideoViews.AsNoTracking()
-                    .Where(x => x.VideoId == videoId).Select(x => (long?)x.Count)
-                    .SingleOrDefaultAsync(cancellationToken) ?? 0;
-                await database.StringSetAsync(Views(videoId), count).WaitAsync(cancellationToken);
-                viewValue = count;
+                var count = await db.VideoViews.AsNoTracking().Where(x => x.VideoId == videoId)
+                    .Select(x => (long?)x.Count).SingleOrDefaultAsync(ct) ?? 0;
+                values[2] = await WriteCountAsync(Views(videoId), count, "initialize", ct);
             }
-            if (commentValue.IsNull)
+            if (values[3].IsNull)
             {
-                var count = await dbContext.Comments.AsNoTracking().LongCountAsync(x => x.VideoId == videoId, cancellationToken);
-                await database.StringSetAsync(Comments(videoId), count).WaitAsync(cancellationToken);
-                commentValue = count;
+                values[3] = RedisResult.Create((RedisValue)await ReadCommentCountAsync(videoId, ct));
             }
         }
-
-        return new VideoSummaryResponse(videoId, likes, dislikes, (long)viewValue, (long)commentValue);
+        return new(videoId, (long)values[0], (long)values[1], (long)values[2], (long)values[3]);
     }
 
-    public async Task<string> GetReactionAsync(Guid videoId, Guid userId, CancellationToken cancellationToken)
+    public async Task<string> GetReactionAsync(Guid videoId, Guid userId, CancellationToken ct)
     {
-        await EnsureReactionCacheAsync(videoId, cancellationToken);
-        var database = redis.GetDatabase();
-        if (await database.SetContainsAsync(Likes(videoId), userId.ToString("D")).WaitAsync(cancellationToken)) return "like";
-        if (await database.SetContainsAsync(Dislikes(videoId), userId.ToString("D")).WaitAsync(cancellationToken)) return "dislike";
-        return "none";
+        await EnsureReactionCacheAsync(videoId, ct);
+        return (string)(await scripts.ExecuteAsync("reaction-read", [Likes(videoId), Dislikes(videoId)],
+            [userId.ToString("D")], ct))!;
     }
 
-    public async Task<(long Likes, long Dislikes)> ApplyReactionAsync(
-        Guid videoId,
-        Guid userId,
-        string reaction,
-        long kafkaOffset,
-        CancellationToken cancellationToken)
+    public async Task<(long Likes, long Dislikes)> ApplyReactionAsync(Guid videoId, Guid userId,
+        string reaction, long kafkaOffset, CancellationToken ct)
     {
-        var result = await redis.GetDatabase().ScriptEvaluateAsync(
-            ApplyReactionScript,
-            [Likes(videoId), Dislikes(videoId), ReactionVersions(videoId), ReactionReady(videoId)],
-            [userId.ToString("D"), reaction, kafkaOffset]).WaitAsync(cancellationToken);
-        var values = (RedisResult[])result!;
+        var values = (RedisResult[])(await scripts.ExecuteAsync("reaction-apply",
+            [Likes(videoId), Dislikes(videoId), ReactionVersions(videoId)],
+            [userId.ToString("D"), reaction, kafkaOffset.ToString(CultureInfo.InvariantCulture)], ct))!;
         return ((long)values[0], (long)values[1]);
     }
 
-    public async Task<(bool Counted, long Count)> IncrementViewOnceAsync(
-        Guid videoId,
-        Guid sessionId,
-        int ttlHours,
-        CancellationToken cancellationToken)
+    public async Task<(bool Counted, long Count)> IncrementViewOnceAsync(Guid videoId, Guid sessionId,
+        int ttlHours, CancellationToken ct)
     {
-        var result = await redis.GetDatabase().ScriptEvaluateAsync(
-            IncrementViewScript,
-            [ViewSession(sessionId), Views(videoId)],
-            [(long)TimeSpan.FromHours(ttlHours).TotalSeconds]).WaitAsync(cancellationToken);
-        var values = (RedisResult[])result!;
-        return ((long)values[0] == 1, (long)values[1]);
+        var values = (RedisResult[])(await scripts.ExecuteAsync("view-increment",
+            [ViewSession(sessionId), Views(videoId)], [(long)TimeSpan.FromHours(ttlHours).TotalSeconds], ct))!;
+        return ((int)values[0] == 1, (long)values[1]);
     }
 
-    public Task SetCommentCountAsync(Guid videoId, long count) =>
-        redis.GetDatabase().StringSetAsync(Comments(videoId), count);
+    public async Task InvalidateCommentCountAsync(Guid videoId) =>
+        _ = await scripts.ExecuteAsync("comment-invalidate", [Comments(videoId), CommentGeneration(videoId)],
+            [Guid.NewGuid().ToString("N")], CancellationToken.None);
 
-    public async Task EnsureViewAtLeastAsync(Guid videoId, long durableCount, CancellationToken cancellationToken) =>
-        _ = await redis.GetDatabase().ScriptEvaluateAsync(
-            EnsureAtLeastScript,
-            [Views(videoId)],
-            [durableCount]).WaitAsync(cancellationToken);
-
-    private async Task EnsureReactionCacheAsync(Guid videoId, CancellationToken cancellationToken)
+    private async Task<long> ReadCommentCountAsync(Guid videoId, CancellationToken ct)
     {
-        var database = redis.GetDatabase();
-        if (await database.KeyExistsAsync(ReactionReady(videoId)).WaitAsync(cancellationToken)) return;
-
-        await HydrationLock.WaitAsync(cancellationToken);
-        try
+        long count = 0;
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            if (await database.KeyExistsAsync(ReactionReady(videoId)).WaitAsync(cancellationToken)) return;
-            await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var reactions = await dbContext.Reactions.AsNoTracking()
-                .Where(x => x.VideoId == videoId).ToListAsync(cancellationToken);
+            var read = (RedisResult[])(await scripts.ExecuteAsync("comment-read",
+                [Comments(videoId), CommentGeneration(videoId)], [], ct))!;
+            if (!read[0].IsNull) return (long)read[0];
+            var generation = (string)read[1]!;
+            if (generation.Length == 0)
+                generation = (string)(await scripts.ExecuteAsync("comment-begin",
+                    [Comments(videoId), CommentGeneration(videoId)], [Guid.NewGuid().ToString("N")], ct))!;
+            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            count = await db.Comments.LongCountAsync(x => x.VideoId == videoId, ct);
+            var initialized = await scripts.ExecuteAsync("comment-initialize",
+                [Comments(videoId), CommentGeneration(videoId)],
+                [generation, count.ToString(CultureInfo.InvariantCulture)], ct);
+            if (!initialized.IsNull) return (long)initialized;
+        }
+        return count; // A busy video can return its latest database read without publishing a stale cache.
+    }
 
-            await database.KeyDeleteAsync([Likes(videoId), Dislikes(videoId), ReactionVersions(videoId)]).WaitAsync(cancellationToken);
-            foreach (var reaction in reactions)
+    public async Task EnsureViewAtLeastAsync(Guid videoId, long durableCount, CancellationToken ct) =>
+        _ = await WriteCountAsync(Views(videoId), durableCount, "maximum", ct);
+
+    private Task<RedisResult> WriteCountAsync(RedisKey key, long count, string mode, CancellationToken ct) =>
+        scripts.ExecuteAsync("count-write", [key], [count.ToString(CultureInfo.InvariantCulture), mode], ct);
+
+    private Task EnsureReactionCacheAsync(Guid videoId, CancellationToken ct)
+    {
+        RedisKey[] controls = [$"{ReactionReady(videoId)}:lease", $"{ReactionReady(videoId)}:generation", ReactionReady(videoId)];
+        return new CacheRebuilder(scripts).EnsureAsync(controls, async (token, cancel) =>
+        {
+            await using var strategyContext = await contextFactory.CreateDbContextAsync(cancel);
+            await strategyContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
-                var member = reaction.UserId.ToString("D");
-                await database.SetAddAsync(reaction.Value == "like" ? Likes(videoId) : Dislikes(videoId), member)
-                    .WaitAsync(cancellationToken);
-                await database.HashSetAsync(ReactionVersions(videoId), member, reaction.SourceOffset)
-                    .WaitAsync(cancellationToken);
-            }
-            await database.StringSetAsync(ReactionReady(videoId), "1").WaitAsync(cancellationToken);
-        }
-        finally
-        {
-            HydrationLock.Release();
-        }
+                await using var db = await contextFactory.CreateDbContextAsync(cancel);
+                await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, cancel);
+                Guid? last = null;
+                while (true)
+                {
+                    var query = db.Reactions.AsNoTracking().Where(x => x.VideoId == videoId);
+                    if (last is { } id) query = query.Where(x => x.UserId.CompareTo(id) > 0);
+                    var batch = await query.OrderBy(x => x.UserId).Take(500).ToListAsync(cancel);
+                    if (batch.Count == 0) break;
+                    var args = new List<RedisValue> { token };
+                    foreach (var item in batch)
+                        args.AddRange([item.UserId.ToString("D"), item.Value, item.SourceOffset.ToString(CultureInfo.InvariantCulture)]);
+                    if ((int)await scripts.ExecuteAsync("reaction-merge",
+                        [Likes(videoId), Dislikes(videoId), ReactionVersions(videoId), controls[0], controls[1]], args.ToArray(), cancel) != 1)
+                        throw new RedisServerException("CACHE_REBUILD_LOST");
+                    last = batch[^1].UserId;
+                }
+                await transaction.CommitAsync(cancel);
+            });
+        }, ct);
     }
 
     private static RedisKey Likes(Guid id) => $"{Prefix}:videos:{id:D}:likes";
@@ -155,5 +130,6 @@ public sealed class RedisEngagementProjection(
     private static RedisKey ReactionReady(Guid id) => $"{Prefix}:videos:{id:D}:reactions-ready";
     private static RedisKey Views(Guid id) => $"{Prefix}:videos:{id:D}:views";
     private static RedisKey Comments(Guid id) => $"{Prefix}:videos:{id:D}:comments";
+    private static RedisKey CommentGeneration(Guid id) => $"{Prefix}:videos:{id:D}:comments-generation";
     private static RedisKey ViewSession(Guid id) => $"{Prefix}:view-sessions:{id:D}";
 }

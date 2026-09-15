@@ -14,7 +14,7 @@ export const authGuard: CanActivateFn = async (_route, state) => {
       await auth.refreshCsrf();
       return true;
     } catch {
-      auth.message.set('Uploads are temporarily unavailable. Please try again.');
+      auth.message.set('Your account is temporarily unavailable. Please try again.');
       return false;
     }
   }
