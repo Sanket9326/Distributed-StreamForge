@@ -35,6 +35,7 @@ describe('App shell', () => {
     expect(links.map((link) => link.getAttribute('aria-label'))).toEqual([
       'Home',
       'Upload',
+      'Subscriptions',
     ]);
     expect(fixture.nativeElement.textContent).toContain('No videos are ready yet');
 

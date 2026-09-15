@@ -13,6 +13,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0006: Identity-owned accounts and Redis browser sessions](0006-session-authentication.md)
 - [0007: Engagement-owned reactions, comments, and visible views](0007-engagement-projections.md)
 - [0008: Durable Elasticsearch video search](0008-durable-elasticsearch-video-search.md)
+- [0009: Asynchronous subscriptions and Lua Redis operations](0009-async-subscriptions-and-lua-redis.md)
 
 ```markdown
 # NNNN: Decision title

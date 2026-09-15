@@ -55,7 +55,7 @@ app.UseMiddleware<SessionMiddleware>();
 app.MapHealthChecks("/health");
 app.MapGet("/health/ready", async (IConnectionMultiplexer redis, CancellationToken cancellationToken) =>
 {
-    try { await redis.GetDatabase().PingAsync().WaitAsync(cancellationToken); return Results.Ok(); }
+    try { await new StreamForge.Gateway.Api.Infrastructure.Redis.LuaScriptExecutor(redis).ReadyAsync(cancellationToken); return Results.Ok(); }
     catch (RedisException) { return Results.StatusCode(503); }
 });
 app.MapGet("/api/auth/csrf", (HttpContext context, IAntiforgery antiforgery) =>

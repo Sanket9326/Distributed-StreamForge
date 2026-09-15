@@ -26,7 +26,7 @@ public sealed class InfrastructureInitializer(
         {
             await dbContext.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_unlock({MigrationLockId})", cancellationToken);
         }
-        await redis.GetDatabase().PingAsync().WaitAsync(cancellationToken);
+        await new StreamForge.Engagement.Api.Infrastructure.Redis.LuaScriptExecutor(redis).ReadyAsync(cancellationToken);
         await topics.InitializeAsync(cancellationToken);
         startupGate.MarkReady();
         logger.LogInformation("Engagement infrastructure is ready");

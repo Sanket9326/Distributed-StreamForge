@@ -14,7 +14,7 @@ public sealed class KafkaTopicManager(IOptions<KafkaOptions> options)
         using var admin = CreateClient();
         var timeout = TimeSpan.FromSeconds(value.InitializationTimeoutSeconds);
         var metadata = admin.GetMetadata(timeout);
-        var missing = new[] { value.ReactionTopic, value.ViewTopic }
+        var missing = new[] { value.ReactionTopic, value.ViewTopic, value.SubscriptionTopic, value.SubscriptionDeadLetterTopic }
             .Where(name => !metadata.Topics.Any(x => x.Topic == name && x.Error.Code == ErrorCode.NoError))
             .Select(name => new TopicSpecification
             {
@@ -36,12 +36,14 @@ public sealed class KafkaTopicManager(IOptions<KafkaOptions> options)
     {
         using var admin = CreateClient();
         var metadata = admin.GetMetadata(TimeSpan.FromSeconds(Math.Min(10, value.InitializationTimeoutSeconds)));
-        foreach (var name in new[] { value.ReactionTopic, value.ViewTopic, value.CompletedTopic })
+        foreach (var name in new[] { value.ReactionTopic, value.ViewTopic, value.CompletedTopic, value.SubscriptionTopic, value.SubscriptionDeadLetterTopic })
         {
             if (!metadata.Topics.Any(x => x.Topic == name && x.Error.Code == ErrorCode.NoError))
                 throw new InvalidOperationException($"Kafka topic '{name}' is unavailable.");
         }
         cancellationToken.ThrowIfCancellationRequested();
+        if (metadata.Topics.Single(x => x.Topic == value.SubscriptionTopic).Partitions.Count != value.PartitionCount)
+            throw new InvalidOperationException("Subscription topic partition count must remain fixed.");
         return Task.CompletedTask;
     }
 

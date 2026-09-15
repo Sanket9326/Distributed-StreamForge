@@ -3,6 +3,13 @@ import { authGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
   {
+    path: 'subscriptions',
+    loadComponent: () =>
+      import('./subscriptions/subscriptions.page').then((module) => module.SubscriptionsPage),
+    canActivate: [authGuard],
+    title: 'Subscriptions · StreamForge',
+  },
+  {
     path: '',
     loadComponent: () => import('./feed/home-feed.page').then((module) => module.HomeFeedPage),
     title: 'Home · StreamForge',

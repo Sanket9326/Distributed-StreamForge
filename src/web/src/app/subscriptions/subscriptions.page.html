@@ -1,0 +1,100 @@
+<section class="subscriptions-page">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">YOUR COMMUNITY</p>
+      <h1>Subscriptions</h1>
+      <p>Keep up with creators and manage your subscribers.</p>
+    </div>
+    <button type="button" class="refresh" [disabled]="loading()" (click)="load()">Refresh</button>
+  </div>
+  <div class="tabs" role="group" aria-label="Subscription lists">
+    <button
+      type="button"
+      [attr.aria-pressed]="!incoming()"
+      [class.selected]="!incoming()"
+      (click)="select(false)"
+    >
+      My subscriptions
+    </button>
+    <button
+      type="button"
+      [attr.aria-pressed]="incoming()"
+      [class.selected]="incoming()"
+      (click)="select(true)"
+    >
+      My subscribers
+    </button>
+  </div>
+  <p class="private-note">Only you can see this list.</p>
+  <p class="feedback" role="status" aria-live="polite">{{ feedback() }}</p>
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  @if (loading()) {
+    <p role="status">Loading subscriptions…</p>
+  }
+  <ul class="people" [attr.aria-label]="incoming() ? 'My subscribers' : 'My subscriptions'">
+    @for (item of visible(); track item.userId) {
+      @let relation = subscriptions.state(item.userId, incoming());
+      <li [class.changing]="relation.busy">
+        <span class="avatar" aria-hidden="true">{{
+          (names().get(item.userId) || 'S').charAt(0).toUpperCase()
+        }}</span>
+        <div class="person">
+          <strong>{{ names().get(item.userId) || 'StreamForge user' }}</strong>
+          <span>Subscribed {{ item.createdAtUtc | date: 'mediumDate' }}</span>
+          @if (relation.message) {
+            <span class="error" role="status">{{ relation.message }}</span>
+          }
+        </div>
+        <div class="actions">
+          @if (incoming()) {
+            @let reverse = subscriptions.state(item.userId);
+            <button
+              type="button"
+              class="subscribe"
+              [disabled]="reverse.busy || reverse.isActive"
+              [class.changing]="reverse.busy"
+              (click)="change(item.userId, true, false)"
+            >
+              {{ reverse.isActive ? 'Subscribed' : 'Subscribe back' }}
+            </button>
+            <button
+              type="button"
+              [disabled]="relation.busy"
+              (click)="change(item.userId, false, true)"
+            >
+              Remove subscriber
+            </button>
+          } @else {
+            <button
+              type="button"
+              [disabled]="relation.busy"
+              (click)="change(item.userId, false, false)"
+            >
+              {{ relation.busy ? 'Unsubscribing…' : 'Unsubscribe' }}
+            </button>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+  @if (!loading() && !error() && !visible().length) {
+    <div class="empty">
+      <span aria-hidden="true">◎</span>
+      <h2>{{ incoming() ? 'No subscribers yet' : 'Find your next favorite creator' }}</h2>
+      <p>
+        {{
+          incoming()
+            ? 'People who subscribe to you will appear here.'
+            : 'Subscribe while watching a video to see its creator here.'
+        }}
+      </p>
+    </div>
+  }
+  @if (cursor()) {
+    <button type="button" class="load-more" [disabled]="loading()" (click)="load(true)">
+      Load more
+    </button>
+  }
+</section>

@@ -10,6 +10,8 @@ See [engagement contracts](engagement.md) for reactions, qualified views, commen
 public profiles, and stable watch-page video lookup.
 See [search contracts](search.md) for suggestions, the Feed-to-Search event,
 revision handling, and the indexing dead-letter topic.
+See [subscription contracts](subscriptions.md) for private lists, directed
+relationship mutations, Kafka acceptance and Redis projection positions.
 
 ## Upload a video
 

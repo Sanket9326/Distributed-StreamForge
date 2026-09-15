@@ -17,6 +17,51 @@ namespace StreamForge.Identity.IntegrationTests;
 
 public sealed class IdentityTests(IdentityApiFactory factory) : IClassFixture<IdentityApiFactory>
 {
+    [Fact]
+    public async Task LuaSessions_ReadAndLogoutWorkUnderMemoryPressure_AndFlushRecovers()
+    {
+        var store = factory.Services.GetRequiredService<ISessionStore>();
+        var session = await store.CreateAsync(Guid.NewGuid(), null, default);
+        using var admin = await ConnectionMultiplexer.ConnectAsync(factory.RedisConnection + ",allowAdmin=true");
+        var server = admin.GetServer(admin.GetEndPoints().Single());
+        await server.ScriptFlushAsync();
+        Assert.NotNull(await store.ReadAsync(session.Id, default));
+        var original = (await server.ConfigGetAsync("maxmemory")).Single().Value;
+        try
+        {
+            await server.ConfigSetAsync("maxmemory", "1");
+            Assert.NotNull(await store.ReadAsync(session.Id, default));
+            Assert.NotNull(await new GatewayReader(admin, TimeProvider.System).ReadAsync(session.Id, default));
+            await new StreamForge.Identity.Api.Infrastructure.Redis.LuaScriptExecutor(admin).ReadyAsync(default);
+            await Assert.ThrowsAnyAsync<RedisException>(() => store.CreateAsync(Guid.NewGuid(), null, default));
+            await store.DeleteAsync(session.Id, default);
+            Assert.Null(await store.ReadAsync(session.Id, default));
+        }
+        finally { await server.ConfigSetAsync("maxmemory", original); }
+        var recovered = await store.CreateAsync(Guid.NewGuid(), null, default);
+        Assert.NotNull(await store.ReadAsync(recovered.Id, default));
+    }
+
+    [Fact]
+    public async Task LuaThrottle_ConcurrentAttemptsKeepFixedWindowAndExactLimit()
+    {
+        var redis = factory.Services.GetRequiredService<IConnectionMultiplexer>();
+        var scripts = new StreamForge.Identity.Api.Infrastructure.Redis.LuaScriptExecutor(redis);
+        RedisKey key = "fixture:throttle:" + Guid.NewGuid();
+        var results = await Task.WhenAll(Enumerable.Range(0, 25).Select(_ =>
+            scripts.ExecuteAsync("throttle", [key], [60, 10])));
+        Assert.Equal(10, results.Count(value => (int)value == 0));
+        Assert.All(results.Where(value => (int)value > 0), value => Assert.InRange((int)value, 59, 60));
+        var db = redis.GetDatabase();
+        await db.KeyExpireAsync(key, TimeSpan.FromSeconds(5));
+        var retry = (int)await scripts.ExecuteAsync("throttle", [key], [60, 10]);
+        Assert.InRange(retry, 1, 5);
+        Assert.InRange((await db.KeyTimeToLiveAsync(key))!.Value.TotalSeconds, 0, 5);
+        await db.KeyDeleteAsync(key);
+        Assert.Equal(0, (int)await scripts.ExecuteAsync("throttle", [key], [60, 10]));
+        await db.KeyDeleteAsync(key);
+    }
+
     private const string Password = "a sufficiently long password";
     private static RegisterRequest Registration(string? name = null) => new(name ?? "user" + Guid.NewGuid().ToString("N"),
         Guid.NewGuid().ToString("N") + "@example.test", Password, null, null);

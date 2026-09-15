@@ -1,5 +1,8 @@
 # Async Ingestion Runbook
 
+See [subscriptions and Redis](subscriptions-and-redis.md) for staged deployment,
+Lua diagnostics, subscription lag, cache rebuilding and failure recovery.
+
 ## Startup does not become ready
 
 Upload intentionally blocks readiness until PostgreSQL migrations, the private

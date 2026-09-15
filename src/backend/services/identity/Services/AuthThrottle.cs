@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using StreamForge.Identity.Api.Infrastructure.Redis;
 
 namespace StreamForge.Identity.Api.Services;
 
@@ -17,7 +18,7 @@ public sealed class AuthThrottleOptions
 }
 
 /// <summary>Atomically counts attempts across replicas without retaining emails or IPs in keys.</summary>
-public sealed class AuthThrottle(IConnectionMultiplexer redis, IOptions<AuthThrottleOptions> options)
+public sealed class AuthThrottle(IConnectionMultiplexer redis, IOptions<AuthThrottleOptions> options, ILogger<LuaScriptExecutor>? logger = null)
 {
     /// <summary>Checks both email and network login budgets.</summary>
     public async Task LoginAsync(string email, string ip, CancellationToken cancellationToken)
@@ -33,9 +34,7 @@ public sealed class AuthThrottle(IConnectionMultiplexer redis, IOptions<AuthThro
     {
         var key = "streamforge:identity:limits:v1:" + scope + ":" +
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
-        const string script = "local n = redis.call('INCR', KEYS[1]); if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; " +
-            "if n > tonumber(ARGV[2]) then return redis.call('TTL', KEYS[1]) else return 0 end";
-        var retry = (int)await redis.GetDatabase().ScriptEvaluateAsync(script, [key], [seconds, limit]).WaitAsync(cancellationToken);
+        var retry = (int)await new LuaScriptExecutor(redis, logger).ExecuteAsync("throttle", [key], [seconds, limit], cancellationToken);
         if (retry > 0)
         {
             throw new AuthFailure(429, "rate_limited", "Too many attempts. Please try again later.", retry);

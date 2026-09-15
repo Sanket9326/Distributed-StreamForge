@@ -114,6 +114,11 @@ port 5081 and feed requests to Feed on port 5082.
 
 ## Run with Docker
 
+Production frontend builds keep Google Fonts as a browser request instead of
+downloading and inlining them during compilation. Docker builds therefore do
+not require access to the font CDN; browsers use the CSS fallback font if that
+CDN is unavailable.
+
 ```powershell
 Copy-Item .env.example .env
 ./infra/docker/setup-local-https.ps1 -Trust
