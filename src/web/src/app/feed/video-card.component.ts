@@ -13,6 +13,8 @@ import {
   signal,
   effect,
   untracked,
+  afterNextRender,
+  Injector,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FeedRendition, FeedService, FeedVideo } from './feed.service';
@@ -27,6 +29,8 @@ import { AuthService } from '../auth/auth.service';
 import { Router } from '@angular/router';
 import { ProfileService } from '../profiles/profile.service';
 import { SubscriptionService } from '../subscriptions/subscription.service';
+import { WatchHistoryService } from '../history/watch-history.service';
+import { WatchHistoryPlayback } from '../history/watch-history-playback';
 
 export interface PlaybackQualityChanged {
   videoId: string;
@@ -82,6 +86,14 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   protected readonly autoplayBlocked = signal(false);
   protected readonly startedMuted = signal(false);
   protected readonly playing = signal(false);
+  protected readonly historyNotice = signal('');
+  private readonly history = inject(WatchHistoryService);
+  private historyPlayback?: WatchHistoryPlayback;
+  private sourceChanging = true;
+  private sourceRequested = false;
+  private destroyed = false;
+  private loadPosition = 0;
+  private continueAfterMetadata = false;
   private readonly host = inject(ElementRef<HTMLElement>);
   private readonly feedService = inject(FeedService);
   protected readonly auth = inject(AuthService);
@@ -90,6 +102,7 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly profiles = inject(ProfileService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private observer?: IntersectionObserver;
   private adapter?: VideoPlayerAdapter;
   private hlsRetry = false;
@@ -156,6 +169,8 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.observer.observe(this.host.nativeElement);
   }
   ngOnDestroy(): void {
+    this.historyPlayback?.dispose();
+    this.destroyed = true;
     this.stopWatchClock();
     this.observer?.disconnect();
     this.adapter?.destroy();
@@ -177,12 +192,31 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.startingPlayback.set(false);
     this.autoplayBlocked.set(false);
     this.playingStartedAt ??= Date.now();
+    this.historyPlayback?.playing();
   }
   protected onPause(): void {
     this.stopWatchClock();
     this.playing.set(false);
     this.startingPlayback.set(false);
+    if (!this.sourceChanging) void this.historyPlayback?.flush();
   }
+  protected onEnded(): void {
+    this.stopWatchClock(); this.playing.set(false); this.startingPlayback.set(false);
+    void this.historyPlayback?.flush(false, true);
+  }
+  protected onLoadedMetadata(): void {
+    const element = this.player?.nativeElement;
+    if (!element || !this.sourceChanging) return;
+    const duration = element.duration;
+    element.currentTime = Number.isFinite(duration) && duration > 0
+      ? Math.min(this.loadPosition, Math.max(0, duration - 0.1)) : Math.max(0, this.loadPosition);
+    this.sourceChanging = false;
+    if (this.continueAfterMetadata) { this.continueAfterMetadata = false; this.requestPlayback(false); }
+  }
+  @HostListener('document:visibilitychange') saveOnHidden(): void {
+    if (document.visibilityState === 'hidden') void this.historyPlayback?.flush(true);
+  }
+  @HostListener('window:pagehide') saveOnPageExit(): void { void this.historyPlayback?.flush(true); }
   protected startFromOverlay(): void {
     const element = this.player?.nativeElement;
     if (!element) return;
@@ -205,6 +239,7 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   protected onTimeUpdate(): void {
+    if (this.playing() && !this.player?.nativeElement.paused) this.historyPlayback?.playing();
     if (this.viewSubmitted || this.playingStartedAt === null) return;
     if (this.watchedMilliseconds + Date.now() - this.playingStartedAt >= 10_000) {
       this.stopWatchClock();
@@ -349,7 +384,8 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (!this.mp4Retried) {
       this.mp4Retried = true;
-      this.refreshRenditions();
+      this.refreshRenditions(this.sourceChanging ? this.loadPosition : this.player?.nativeElement.currentTime ?? this.loadPosition,
+        this.player?.nativeElement.paused ?? true);
       return;
     }
     this.playbackError.set('This video could not be loaded. Try again later.');
@@ -494,6 +530,17 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private ensureSource(): void {
+    if (this.sourceRequested) return;
+    this.sourceRequested = true;
+    if (this.player) this.historyPlayback = new WatchHistoryPlayback(this.history, this.video().id,
+      this.player.nativeElement, (message) => this.historyNotice.set(message), () => this.sourceChanging);
+    void this.prepareHistorySource();
+  }
+  private async prepareHistorySource(): Promise<void> {
+    const resume = await this.history.resume(this.video().id);
+    if (this.destroyed) return;
+    this.loadPosition = resume.position;
+    if (resume.unavailable) this.historyNotice.set('Saved progress is unavailable. Starting from the beginning.');
     const manifest = this.video().hlsManifestUrl;
     if (manifest && this.player) {
       this.attachHls(manifest);
@@ -501,8 +548,9 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.useProgressive();
   }
-  private attachHls(url: string): void {
+  private attachHls(url: string, time = this.loadPosition, paused = true): void {
     if (!this.player) return;
+    this.prepareLoad(time, paused);
     this.sourceUrl.set('');
     this.adapter = new VideoPlayerAdapter(this.player.nativeElement, {
       levels: (levels) => {
@@ -516,13 +564,13 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       fatal: () => this.recoverHls(),
     });
-    const kind = this.adapter.attach(url);
+    const kind = this.adapter.attach(url, time);
     if (kind === 'native') {
       this.mode.set('native-hls');
       this.sourceUrl.set(url);
       this.prepared.set(true);
       this.emitQuality();
-    } else if (kind === 'unavailable') this.useProgressive();
+    } else if (kind === 'unavailable') this.useProgressive(time, paused);
     else {
       this.mode.set('auto');
       if (this.autoplay()) {
@@ -535,28 +583,21 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
   private recoverHls(): void {
     if (!this.player) return;
     const element = this.player.nativeElement;
-    const time = element.currentTime;
+    const time = this.sourceChanging ? this.loadPosition : element.currentTime;
     const paused = element.paused;
     const manifest = this.video().hlsManifestUrl;
     if (!this.hlsRetry && manifest) {
       this.hlsRetry = true;
       this.adapter?.destroy();
       this.prepared.set(false);
-      this.attachHls(manifest);
+      this.attachHls(manifest, time, paused);
       if (!paused) this.adapter?.start();
-      element.addEventListener(
-        'loadedmetadata',
-        () => {
-          element.currentTime = time;
-          if (!paused) void element.play();
-        },
-        { once: true },
-      );
       return;
     }
     this.useProgressive(time, paused);
   }
-  private useProgressive(time = 0, paused = true): void {
+  private useProgressive(time = this.loadPosition, paused = true): void {
+    this.prepareLoad(time, paused);
     this.adapter?.destroy();
     const rendition = this.bestProgressive();
     if (!rendition) {
@@ -572,21 +613,14 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.sourceUrl.set(rendition.playbackUrl);
     this.prepared.set(true);
-    queueMicrotask(() => {
+    afterNextRender(() => {
+      if (this.destroyed) return;
       const element = this.player?.nativeElement;
       if (element) {
         element.load();
         this.beginAutoplay();
-        element.addEventListener(
-          'loadedmetadata',
-          () => {
-            element.currentTime = time;
-            if (!paused) void element.play();
-          },
-          { once: true },
-        );
       }
-    });
+    }, { injector: this.injector });
     this.emitQuality();
   }
   private bestProgressive(values = this.video().renditions): FeedRendition | undefined {
@@ -596,7 +630,7 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (width <= 0 || height <= 0) return sorted.at(-1);
     return sorted.find((x) => x.width >= width && x.height >= height) ?? sorted.at(-1);
   }
-  private refreshRenditions(time = 0, paused = true): void {
+  private refreshRenditions(time = this.loadPosition, paused = true): void {
     if (this.refreshing()) return;
     this.refreshing.set(true);
     this.feedService
@@ -606,24 +640,18 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
         next: (renditions) => {
           const selected = this.bestProgressive(renditions);
           if (selected) {
+            this.prepareLoad(time, paused);
             this.playbackError.set('');
             this.sourceUrl.set(selected.playbackUrl);
             this.prepared.set(true);
-            queueMicrotask(() => {
+            afterNextRender(() => {
+              if (this.destroyed) return;
               const element = this.player?.nativeElement;
               if (element) {
                 element.load();
                 this.beginAutoplay();
-                element.addEventListener(
-                  'loadedmetadata',
-                  () => {
-                    element.currentTime = time;
-                    if (!paused) void element.play();
-                  },
-                  { once: true },
-                );
               }
-            });
+            }, { injector: this.injector });
           } else this.playbackError.set('No playable rendition is available.');
           this.refreshing.set(false);
         },
@@ -634,11 +662,13 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
   private beginAutoplay(): void {
+    if (this.destroyed) return;
     if (!this.autoplay() || this.autoplayAttempted) return;
     this.autoplayAttempted = true;
     this.requestPlayback(true);
   }
   private requestPlayback(allowMutedFallback: boolean): void {
+    if (this.destroyed) return;
     const element = this.player?.nativeElement;
     if (!element) return;
     this.adapter?.start();
@@ -692,5 +722,10 @@ export class VideoCardComponent implements OnInit, AfterViewInit, OnDestroy {
       activeHeight: active?.height ?? null,
       bitrateBitsPerSecond: this.mode() === 'progressive' ? null : (active?.bitrate ?? null),
     });
+  }
+  private prepareLoad(time: number, paused: boolean): void {
+    this.sourceChanging = true;
+    this.loadPosition = Number.isFinite(time) ? Math.max(0, time) : 0;
+    this.continueAfterMetadata = !paused;
   }
 }

@@ -8,12 +8,15 @@ public sealed class SessionGatewayTests(GatewayApiFactory factory) : IClassFixtu
 {
     [Theory]
     [InlineData("GET", "/api/engagement/subscriptions")]
+    [InlineData("GET", "/api/engagement/watch-history")]
+    [InlineData("GET", "/api/engagement/watch-history/10000000-0000-0000-0000-000000000001")]
+    [InlineData("PUT", "/api/engagement/watch-history/10000000-0000-0000-0000-000000000001")]
     [InlineData("GET", "/api/engagement/subscriptions/subscribers")]
     [InlineData("GET", "/api/engagement/subscriptions/status")]
     [InlineData("PUT", "/api/engagement/subscriptions/10000000-0000-0000-0000-000000000001")]
     [InlineData("DELETE", "/api/engagement/subscriptions/10000000-0000-0000-0000-000000000001")]
     [InlineData("DELETE", "/api/engagement/subscriptions/subscribers/10000000-0000-0000-0000-000000000001")]
-    public async Task Subscriptions_RequireAuthenticationAndOnlyForwardVerifiedIdentity(string method, string path)
+    public async Task PrivateEngagementRoutes_RequireAuthenticationAndOnlyForwardVerifiedIdentity(string method, string path)
     {
         using var anonymous = await factory.AnonymousClientAsync();
         using var rejected = await anonymous.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));

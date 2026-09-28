@@ -74,6 +74,12 @@ Identity, Gateway and Engagement runs embedded Lua scripts. See
 [ADR 0009](decisions/0009-async-subscriptions-and-lua-redis.md) for ordering,
 rebuilding and session-preserving rollout.
 
+Watch history is also owned by Engagement. Authenticated progress saves flow
+through Kafka acceptance, a Redis projection, and an asynchronous PostgreSQL
+upsert. A history-only Redis scheduler republishes failed work with jitter while
+preserving its original ordering position. Redis retry durability remains deferred
+for v1. See [ADR 0010](decisions/0010-watch-history-and-resume.md).
+
 | Boundary | Responsibility |
 | --- | --- |
 | Gateway | Routing, edge authentication, rate limiting, correlation IDs |
@@ -84,7 +90,7 @@ rebuilding and session-preserving rollout.
 | Processing | Proposed future cross-service workflow orchestration |
 | Transcoding | Durable job state, retries, FFmpeg probing, and MP4 renditions |
 | Playback | V2 HLS projection, strict manifest rewriting, and signed private segment delivery |
-| Engagement | Reactions, comments, qualified visible views, subscriptions, Kafka consumers, and Lua Redis projections |
+| Engagement | Reactions, comments, qualified visible views, subscriptions, per-user watch history, Kafka consumers, and Lua Redis projections |
 | Search | Elasticsearch video projection, durable index consumption, and prefix-aware suggestions |
 | Live streaming | Ingest sessions, live packaging, stream lifecycle |
 | Analytics | Playback events and aggregated viewing metrics |

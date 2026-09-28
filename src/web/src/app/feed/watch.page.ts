@@ -27,6 +27,7 @@ export class WatchPage {
   private readonly profiles = inject(ProfileService);
   private readonly destroyRef = inject(DestroyRef);
   private activePlayer?: HTMLVideoElement;
+  private loadGeneration = 0;
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
@@ -59,6 +60,8 @@ export class WatchPage {
   }
 
   private async load(videoId: string): Promise<void> {
+    const generation = ++this.loadGeneration;
+    this.activePlayer?.pause();
     this.loading.set(true);
     this.error.set('');
     this.video.set(null);
@@ -68,6 +71,7 @@ export class WatchPage {
         firstValueFrom(this.feed.getPage(10, null)),
       ]);
       const recommendations = page.items.filter((candidate) => candidate.id !== video.id);
+      if (generation !== this.loadGeneration) return;
       const all = [video, ...recommendations];
       this.video.set(video);
       this.recommendations.set(recommendations);
@@ -75,12 +79,13 @@ export class WatchPage {
         this.engagement.getSummaries(all.map((candidate) => candidate.id)),
         this.profiles.resolve(all.map((candidate) => candidate.ownerId)),
       ]);
+      if (generation !== this.loadGeneration) return;
       this.summaries.set(new Map(summaries.map((summary) => [summary.videoId, summary])));
       this.creatorNames.set(names);
     } catch {
-      this.error.set('This video could not be loaded. It may no longer be available.');
+      if (generation === this.loadGeneration) this.error.set('This video could not be loaded. It may no longer be available.');
     } finally {
-      this.loading.set(false);
+      if (generation === this.loadGeneration) this.loading.set(false);
     }
   }
 }

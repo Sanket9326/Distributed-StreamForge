@@ -9,6 +9,7 @@ public sealed class EngagementDbContext(DbContextOptions<EngagementDbContext> op
     public DbSet<KnownVideo> Videos => Set<KnownVideo>();
     public DbSet<Reaction> Reactions => Set<Reaction>();
     public DbSet<UserSubscription> Subscriptions => Set<UserSubscription>();
+    public DbSet<WatchHistory> WatchHistory => Set<WatchHistory>();
     public DbSet<VideoView> VideoViews => Set<VideoView>();
     public DbSet<Comment> Comments => Set<Comment>();
     public DbSet<ConsumedKafkaMessage> ConsumedMessages => Set<ConsumedKafkaMessage>();
@@ -16,6 +17,23 @@ public sealed class EngagementDbContext(DbContextOptions<EngagementDbContext> op
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.Entity<WatchHistory>(entity =>
+        {
+            entity.ToTable("watch_history", table => table.HasCheckConstraint("ck_watch_history_progress",
+                "position_ms >= 0 AND duration_ms > 0 AND position_ms <= duration_ms AND duration_ms <= 9007199254740991"));
+            entity.HasKey(x => new { x.UserId, x.VideoId }).HasName("pk_watch_history");
+            entity.Property(x => x.UserId).HasColumnName("user_id");
+            entity.Property(x => x.VideoId).HasColumnName("video_id");
+            entity.Property(x => x.PositionMs).HasColumnName("position_ms");
+            entity.Property(x => x.DurationMs).HasColumnName("duration_ms");
+            entity.Property(x => x.IsCompleted).HasColumnName("is_completed");
+            entity.Property(x => x.CreatedAtUtc).HasColumnName("created_at_utc");
+            entity.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at_utc");
+            entity.Property(x => x.SourcePartition).HasColumnName("source_partition");
+            entity.Property(x => x.SourceOffset).HasColumnName("source_offset");
+            entity.HasIndex(x => new { x.UserId, x.UpdatedAtUtc, x.VideoId })
+                .IsDescending(false, true, true).HasDatabaseName("ix_watch_history_user_updated");
+        });
         modelBuilder.Entity<UserSubscription>(entity =>
         {
             entity.ToTable("subscriptions", table => table.HasCheckConstraint(

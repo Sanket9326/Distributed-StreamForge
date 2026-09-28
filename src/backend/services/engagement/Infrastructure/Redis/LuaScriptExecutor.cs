@@ -47,6 +47,8 @@ public sealed class LuaScriptExecutor(IConnectionMultiplexer redis, ILogger<LuaS
         var resource = assembly.GetManifestResourceNames().Single(x => x.EndsWith($".Scripts.{name}.lua", StringComparison.Ordinal));
         using var reader = new StreamReader(assembly.GetManifestResourceStream(resource)!);
         var source = reader.ReadToEnd();
+        if (source.Contains("-- @history", StringComparison.Ordinal))
+            source = source.Replace("-- @history", Sources.GetOrAdd("history-common", Load), StringComparison.Ordinal);
         if (source.Contains("-- @subscription", StringComparison.Ordinal))
             source = source.Replace("-- @subscription", Sources.GetOrAdd("subscription-common", Load), StringComparison.Ordinal);
         return source.Contains("-- @common", StringComparison.Ordinal)

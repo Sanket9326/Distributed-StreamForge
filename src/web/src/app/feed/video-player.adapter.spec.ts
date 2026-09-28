@@ -43,4 +43,10 @@ describe('VideoPlayerAdapter', () => {
     expect(adapter.attach('/master.m3u8')).toBe('native');
     expect(video.src).toContain('/master.m3u8');
   });
+  it('loads HLS from the saved position without enabling eager segment loading', () => {
+    const adapter = new VideoPlayerAdapter(document.createElement('video'), { levels: vi.fn(), active: vi.fn(), fatal: vi.fn() });
+    adapter.attach('/master.m3u8', 123.5);
+    expect(hlsMock.instances[0].config).toMatchObject({ startPosition: 123.5, autoStartLoad: false });
+    expect(hlsMock.instances[0].startLoad).not.toHaveBeenCalled();
+  });
 });

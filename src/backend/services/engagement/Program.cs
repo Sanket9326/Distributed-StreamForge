@@ -17,11 +17,14 @@ builder.Services.AddExceptionHandler<EngagementExceptionHandler>();
 
 builder.Services.AddOptions<KafkaOptions>().BindConfiguration(KafkaOptions.SectionName)
     .Validate(x => !string.IsNullOrWhiteSpace(x.BootstrapServers), "Kafka bootstrap servers are required.")
-    .Validate(x => new[] { x.ReactionTopic, x.ViewTopic, x.CompletedTopic, x.SubscriptionTopic, x.SubscriptionDeadLetterTopic }
+    .Validate(x => new[] { x.ReactionTopic, x.ViewTopic, x.CompletedTopic, x.SubscriptionTopic, x.SubscriptionDeadLetterTopic,
+        x.WatchHistoryTopic, x.WatchHistoryDeadLetterTopic }
         .All(t => !string.IsNullOrWhiteSpace(t)), "Kafka topic names are required.")
-    .Validate(x => new[] { x.ReactionTopic, x.ViewTopic, x.CompletedTopic, x.SubscriptionTopic, x.SubscriptionDeadLetterTopic }
-        .Distinct().Count() == 5, "Kafka topics must be distinct.")
-    .Validate(x => x.PartitionCount > 0 && x.ReplicationFactor > 0, "Kafka topic settings are invalid.")
+    .Validate(x => new[] { x.ReactionTopic, x.ViewTopic, x.CompletedTopic, x.SubscriptionTopic, x.SubscriptionDeadLetterTopic,
+        x.WatchHistoryTopic, x.WatchHistoryDeadLetterTopic }
+        .Distinct().Count() == 7, "Kafka topics must be distinct.")
+    .Validate(x => x.PartitionCount > 0 && x.ReplicationFactor > 0 && x.WatchHistoryPartitionCount > 0 &&
+        !string.IsNullOrWhiteSpace(x.WatchHistoryConsumerGroupId), "Kafka topic settings are invalid.")
     .ValidateOnStart();
 builder.Services.AddOptions<EngagementOptions>().BindConfiguration(EngagementOptions.SectionName)
     .Validate(x => x.ViewAggregationWindowSeconds > 0 && x.MaximumViewBatchSize > 0 && x.ViewSessionTtlHours > 0,
@@ -57,6 +60,12 @@ builder.Services.AddSingleton<SubscriptionCache>();
 builder.Services.AddSingleton<SubscriptionProjector>();
 builder.Services.AddSingleton<ISubscriptionPublisher>(services => services.GetRequiredService<EngagementKafkaPublisher>());
 builder.Services.AddScoped<SubscriptionService>();
+builder.Services.AddSingleton<WatchHistoryCursorCodec>();
+builder.Services.AddSingleton<WatchHistoryCache>();
+builder.Services.AddSingleton<WatchHistoryProjector>();
+builder.Services.AddSingleton<WatchHistoryRetryQueue>();
+builder.Services.AddSingleton<IWatchHistoryPublisher>(services => services.GetRequiredService<EngagementKafkaPublisher>());
+builder.Services.AddScoped<WatchHistoryService>();
 builder.Services.AddSingleton<StartupGate>();
 builder.Services.AddSingleton<CommentCursorCodec>();
 builder.Services.AddSingleton<KafkaTopicManager>();
@@ -68,6 +77,8 @@ builder.Services.AddHostedService<InfrastructureInitializer>();
 builder.Services.AddHostedService<VideoCatalogConsumer>();
 builder.Services.AddHostedService<ReactionConsumer>();
 builder.Services.AddHostedService<SubscriptionConsumer>();
+builder.Services.AddHostedService<WatchHistoryConsumer>();
+builder.Services.AddHostedService<WatchHistoryRetryWorker>();
 builder.Services.AddHostedService<ViewAggregationConsumer>();
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])

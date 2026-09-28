@@ -1,0 +1,23 @@
+:host { display: block; }
+.history-page { max-width: 1440px; margin: 0 auto; padding: 32px; color: var(--text-primary, #f0f1f5); }
+header { margin-bottom: 32px; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); margin: 6px 0 12px; letter-spacing: -.04em; }
+header p, .history-state p { color: var(--text-secondary, #a4a6b5); line-height: 1.6; }
+.eyebrow { text-transform: uppercase; letter-spacing: .15em; font-size: .75rem; }
+.history-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px 22px; }
+.history-entry { min-width: 0; }
+.progress-details { padding: 8px 4px; }
+progress { display: block; width: 100%; height: 4px; border: 0; border-radius: 4px; overflow: hidden; background: #303241; accent-color: #aa89ff; }
+progress::-webkit-progress-bar { background: #303241; }
+progress::-webkit-progress-value { background: #aa89ff; }
+.progress-details div { display: flex; justify-content: space-between; gap: 12px; margin: 12px 0 7px; font-size: .83rem; }
+.progress-details span, time { color: #a4a6b5; font-size: .78rem; }
+.history-state { padding: 40px 24px; border: 1px solid #303241; border-radius: 18px; text-align: center; margin: 24px 0; }
+.history-state a { color: #c5adff; }
+button { color: #f0f1f5; background: #292435; border: 1px solid #6b547f; border-radius: 12px; padding: 10px 20px; cursor: pointer; font: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid #c5adff; outline-offset: 4px; }
+.load-more { display: block; margin: 30px auto; }
+.unavailable { aspect-ratio: 16/11; border-radius: 16px; background: #20212b; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px; }
+.unavailable span { font-size: 3rem; color: #a4a6b5; }.unavailable h2 { font-size: 1rem; }.unavailable p { color: #a4a6b5; font-size: .85rem; }
+@media (max-width: 1100px) { .history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .history-page { padding: 24px 16px; }.history-grid { grid-template-columns: minmax(0, 1fr); } }

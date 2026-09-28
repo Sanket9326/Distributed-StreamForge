@@ -12,10 +12,10 @@ export class VideoPlayerAdapter {
   private activeLevelIndex = -1;
   constructor(private readonly video: HTMLVideoElement, private readonly callbacks: PlayerCallbacks) {}
 
-  attach(manifestUrl: string): 'hls.js' | 'native' | 'unavailable' {
+  attach(manifestUrl: string, startPositionSeconds = 0): 'hls.js' | 'native' | 'unavailable' {
     this.destroy();
     if (Hls.isSupported()) {
-      const hls = new Hls({ autoStartLoad: false, startLevel: 0, capLevelToPlayerSize: true, ignoreDevicePixelRatio: true });
+      const hls = new Hls({ autoStartLoad: false, startPosition: startPositionSeconds, startLevel: 0, capLevelToPlayerSize: true, ignoreDevicePixelRatio: true });
       this.hls = hls;
       hls.on(Events.MANIFEST_PARSED, (_event, data) => this.callbacks.levels(data.levels.map((level: Level, index: number) => ({ index, height: level.height, bitrate: level.bitrate }))));
       hls.on(Events.FRAG_CHANGED, (_event, data: FragChangedData) => {

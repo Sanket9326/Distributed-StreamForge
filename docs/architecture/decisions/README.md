@@ -14,6 +14,7 @@ Create ADRs as `NNNN-short-title.md`. Use status values `Proposed`, `Accepted`,
 - [0007: Engagement-owned reactions, comments, and visible views](0007-engagement-projections.md)
 - [0008: Durable Elasticsearch video search](0008-durable-elasticsearch-video-search.md)
 - [0009: Asynchronous subscriptions and Lua Redis operations](0009-async-subscriptions-and-lua-redis.md)
+- [0010: Per-user watch history and resume playback](0010-watch-history-and-resume.md)
 
 ```markdown
 # NNNN: Decision title

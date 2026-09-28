@@ -893,3 +893,4 @@
 .subscription-pending { animation: subscription-pulse .65s ease-in-out infinite alternate; }
 @keyframes subscription-pulse { to { opacity: .6; } }
 @media (prefers-reduced-motion: reduce) { .subscription-pending { animation: none; } }
+:host .history-notice { color: #b6bac8; font-size: .85rem; line-height: 1.5; margin: 12px 0; }

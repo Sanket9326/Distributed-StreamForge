@@ -13,6 +13,7 @@ import {
 import { ProfileService } from '../profiles/profile.service';
 import { FeedVideo } from './feed.service';
 import { VideoCardComponent } from './video-card.component';
+import { WatchHistoryService } from '../history/watch-history.service';
 
 describe('VideoCardComponent', () => {
   let fixture: ComponentFixture<VideoCardComponent>;
@@ -31,6 +32,12 @@ describe('VideoCardComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: AuthService, useValue: auth },
+        { provide: WatchHistoryService, useValue: {
+          resume: vi.fn().mockResolvedValue({ position: 0, unavailable: false }),
+          accountKey: () => auth.user()?.id ?? null,
+          register: vi.fn().mockReturnValue(() => undefined),
+          save: vi.fn().mockResolvedValue(true),
+        } },
         { provide: EngagementService, useValue: engagement },
         { provide: ProfileService, useValue: { resolve: vi.fn().mockResolvedValue(new Map()) } },
       ],
@@ -159,12 +166,13 @@ describe('VideoCardComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Older comment');
   });
 
-  it('refreshes a rendition URL that is near expiry', () => {
+  it('refreshes a rendition URL that is near expiry', async () => {
     const expiring = video();
     expiring.renditions[1].playbackUrlExpiresAtUtc = new Date(Date.now() + 30_000).toISOString();
     fixture.componentRef.setInput('video', expiring);
     fixture.detectChanges();
 
+    await Promise.resolve();
     const request = http.expectOne(`/api/feed/videos/${expiring.id}/renditions`);
     request.flush([
       {
@@ -182,12 +190,17 @@ describe('VideoCardComponent', () => {
 
   it('starts playback automatically when opened from the feed', async () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    const history = TestBed.inject(WatchHistoryService);
+    let resolveHistory!: (value: { position: number; unavailable: boolean }) => void;
+    vi.mocked(history.resume).mockReturnValue(new Promise((resolve) => { resolveHistory = resolve; }));
     fixture.componentRef.setInput('video', video());
     fixture.componentRef.setInput('autoplay', true);
     fixture.detectChanges();
     await fixture.whenStable();
-
-    expect(play).toHaveBeenCalledOnce();
+    expect(play).not.toHaveBeenCalled();
+    resolveHistory({ position: 120, unavailable: false });
+    await vi.waitFor(() => expect(play).toHaveBeenCalledOnce());
+    expect(fixture.nativeElement.querySelector('video').getAttribute('src')).toBe('https://storage.test/1080.mp4');
   });
 
   it('falls back to muted playback when the browser blocks audible autoplay', async () => {
@@ -212,6 +225,24 @@ describe('VideoCardComponent', () => {
   function action(label: string): HTMLButtonElement {
     return fixture.nativeElement.querySelector(`button[aria-label="${label}"]`)!;
   }
+
+  it('resumes once metadata arrives and preserves position after refreshing an MP4 link', async () => {
+    const history = TestBed.inject(WatchHistoryService);
+    vi.mocked(history.resume).mockResolvedValue({ position: 120, unavailable: false });
+    fixture.componentRef.setInput('video', video()); fixture.detectChanges();
+    await fixture.whenStable(); fixture.detectChanges();
+    const player = fixture.nativeElement.querySelector('video') as HTMLVideoElement;
+    Object.defineProperty(player, 'duration', { configurable: true, value: 600 });
+    player.dispatchEvent(new Event('loadedmetadata'));
+    expect(player.currentTime).toBe(120);
+    player.currentTime = 200;
+    player.dispatchEvent(new Event('error'));
+    http.expectOne(`/api/feed/videos/${video().id}/renditions`).flush(video().renditions);
+    fixture.detectChanges(); await fixture.whenStable();
+    player.dispatchEvent(new Event('loadedmetadata'));
+    expect(player.currentTime).toBe(200);
+    expect(history.resume).toHaveBeenCalledOnce();
+  });
 
   function findButton(label: string): HTMLButtonElement {
     return (
