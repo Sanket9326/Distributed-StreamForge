@@ -32,8 +32,12 @@ with .NET microservices that handle accounts, uploads, processing, and engagemen
 | 🧭 | **Discover** | Search ready videos as you type, browse the feed, and find recommendations. |
 | 💬 | **Interact** | Like or dislike, post and manage your comments, and see view counts. |
 | 🔗 | **Share** | Copy a stable watch-page link with the creator's public name on display. |
+| ◷ | **Resume** | Sign in to see your watch history and resume from your last saved position. Completed videos start again from the beginning. |
 
 Browsing and playback are public. Create an account to upload, react, and comment.
+Watch history saves when you pause or leave a video, and when playback completes.
+This first version uses best-effort exit saves and nonpersistent Redis retries;
+see the [watch-history notes](docs/operations/runbooks/watch-history.md) for recovery limits.
 
 ## How it works
 
