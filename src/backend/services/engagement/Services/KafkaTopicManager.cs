@@ -14,11 +14,13 @@ public sealed class KafkaTopicManager(IOptions<KafkaOptions> options)
         using var admin = CreateClient();
         var timeout = TimeSpan.FromSeconds(value.InitializationTimeoutSeconds);
         var metadata = admin.GetMetadata(timeout);
-        var missing = new[] { value.ReactionTopic, value.ViewTopic, value.SubscriptionTopic, value.SubscriptionDeadLetterTopic }
+        var missing = new[] { value.ReactionTopic, value.ViewTopic, value.SubscriptionTopic, value.SubscriptionDeadLetterTopic,
+                value.WatchHistoryTopic, value.WatchHistoryDeadLetterTopic }
             .Where(name => !metadata.Topics.Any(x => x.Topic == name && x.Error.Code == ErrorCode.NoError))
             .Select(name => new TopicSpecification
             {
-                Name = name, NumPartitions = value.PartitionCount, ReplicationFactor = value.ReplicationFactor
+                Name = name, NumPartitions = name == value.WatchHistoryTopic || name == value.WatchHistoryDeadLetterTopic
+                    ? value.WatchHistoryPartitionCount : value.PartitionCount, ReplicationFactor = value.ReplicationFactor
             }).ToArray();
         if (missing.Length > 0)
         {
@@ -36,7 +38,8 @@ public sealed class KafkaTopicManager(IOptions<KafkaOptions> options)
     {
         using var admin = CreateClient();
         var metadata = admin.GetMetadata(TimeSpan.FromSeconds(Math.Min(10, value.InitializationTimeoutSeconds)));
-        foreach (var name in new[] { value.ReactionTopic, value.ViewTopic, value.CompletedTopic, value.SubscriptionTopic, value.SubscriptionDeadLetterTopic })
+        foreach (var name in new[] { value.ReactionTopic, value.ViewTopic, value.CompletedTopic, value.SubscriptionTopic,
+            value.SubscriptionDeadLetterTopic, value.WatchHistoryTopic, value.WatchHistoryDeadLetterTopic })
         {
             if (!metadata.Topics.Any(x => x.Topic == name && x.Error.Code == ErrorCode.NoError))
                 throw new InvalidOperationException($"Kafka topic '{name}' is unavailable.");
@@ -44,6 +47,8 @@ public sealed class KafkaTopicManager(IOptions<KafkaOptions> options)
         cancellationToken.ThrowIfCancellationRequested();
         if (metadata.Topics.Single(x => x.Topic == value.SubscriptionTopic).Partitions.Count != value.PartitionCount)
             throw new InvalidOperationException("Subscription topic partition count must remain fixed.");
+        if (metadata.Topics.Single(x => x.Topic == value.WatchHistoryTopic).Partitions.Count != value.WatchHistoryPartitionCount)
+            throw new InvalidOperationException("Watch history topic partition count must remain fixed.");
         return Task.CompletedTask;
     }
 

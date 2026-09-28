@@ -38,8 +38,8 @@ public sealed class RedisPolicyTests
         var folder = Path.Combine(Root(), "src/backend/services/engagement/Infrastructure/Redis/Scripts");
         foreach (var file in Directory.GetFiles(folder, "*.lua"))
             Assert.Single(resources, resource => resource.EndsWith(".Scripts." + Path.GetFileName(file)));
-        foreach (var name in new[] { "ready", "read-string", "reaction-read", "summary-read", "comment-read", "subscription-status", "subscription-page" })
+        foreach (var name in new[] { "ready", "read-string", "reaction-read", "summary-read", "comment-read", "subscription-status", "subscription-page",
+            "history-read", "history-page", "history-retry-stats" })
             Assert.StartsWith("#!lua flags=no-writes", File.ReadAllText(Path.Combine(folder, name + ".lua")));
     }
 }
-

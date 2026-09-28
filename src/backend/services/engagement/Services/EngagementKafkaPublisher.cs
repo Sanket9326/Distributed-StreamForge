@@ -7,7 +7,7 @@ using StreamForge.Engagement.Api.Options;
 
 namespace StreamForge.Engagement.Api.Services;
 
-public sealed class EngagementKafkaPublisher : IDisposable, ISubscriptionPublisher
+public sealed class EngagementKafkaPublisher : IDisposable, ISubscriptionPublisher, IWatchHistoryPublisher
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly IProducer<string, string> producer;
@@ -69,4 +69,25 @@ public sealed class EngagementKafkaPublisher : IDisposable, ISubscriptionPublish
         }, cancellationToken);
 
     public void Dispose() => producer.Dispose();
+
+    public async Task<WatchHistoryDelivery> PublishWatchHistoryAsync(UserWatchProgressSavedV1 message, CancellationToken ct)
+    {
+        var delivery = await PublishAsync(options.WatchHistoryTopic, message.Key, message.EventId,
+            message.EventType, message.EventVersion, message, ct);
+        return new(delivery.Partition.Value, delivery.Offset.Value);
+    }
+    public async Task RepublishWatchHistoryAsync(WatchHistoryRetryEnvelope envelope, CancellationToken ct)
+    {
+        if (envelope.DestinationTopic != options.WatchHistoryTopic || envelope.OriginalPartition < 0 ||
+            envelope.OriginalPartition >= options.WatchHistoryPartitionCount)
+            throw new InvalidOperationException("Invalid watch history retry destination.");
+        var headers = new Headers();
+        foreach (var header in envelope.Headers.Where(x => x.Key != WatchHistoryConsumer.RetryHeader))
+            headers.Add(header.Key, header.Value);
+        headers.Add(WatchHistoryConsumer.RetryHeader, JsonSerializer.SerializeToUtf8Bytes(envelope, Json));
+        await producer.ProduceAsync(new TopicPartition(envelope.DestinationTopic, envelope.OriginalPartition),
+            new Message<string, string> { Key = envelope.Key, Value = envelope.Payload, Headers = headers }, ct);
+    }
+    public async Task PublishWatchHistoryDeadLetterAsync(WatchHistoryDeadLetterV1 message, string key, CancellationToken ct) =>
+        _ = await PublishAsync(options.WatchHistoryDeadLetterTopic, key, message.EventId, message.EventType, message.EventVersion, message, ct);
 }

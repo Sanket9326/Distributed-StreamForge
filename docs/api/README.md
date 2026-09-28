@@ -12,6 +12,8 @@ See [search contracts](search.md) for suggestions, the Feed-to-Search event,
 revision handling, and the indexing dead-letter topic.
 See [subscription contracts](subscriptions.md) for private lists, directed
 relationship mutations, Kafka acceptance and Redis projection positions.
+See [watch-history contracts](watch-history.md) for private history, playback
+progress, resume behavior, and the history retry/dead-letter events.
 
 ## Upload a video
 

@@ -2,6 +2,8 @@
 
 See [subscriptions and Redis](subscriptions-and-redis.md) for staged deployment,
 Lua diagnostics, subscription lag, cache rebuilding and failure recovery.
+See [watch history](watch-history.md) for resume diagnostics, jitter retries,
+deployment, monitoring, and the accepted v1 durability limits.
 
 ## Startup does not become ready
 

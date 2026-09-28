@@ -97,7 +97,8 @@ public sealed class SubscriptionFixture : IAsyncLifetime
         Consumer = new(Projector, Cache, Publisher, new(), Options.Create(Kafka), TimeProvider.System,
             NullLogger<SubscriptionConsumer>.Instance);
         using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = Kafka.BootstrapServers }).Build();
-        await admin.CreateTopicsAsync(new[] { Kafka.SubscriptionTopic, Kafka.SubscriptionDeadLetterTopic }.Select(
+        await admin.CreateTopicsAsync(new[] { Kafka.SubscriptionTopic, Kafka.SubscriptionDeadLetterTopic,
+            Kafka.WatchHistoryTopic, Kafka.WatchHistoryDeadLetterTopic }.Select(
             name => new TopicSpecification { Name = name, NumPartitions = 3, ReplicationFactor = 1 }));
     }
 

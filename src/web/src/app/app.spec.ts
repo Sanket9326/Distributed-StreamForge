@@ -36,6 +36,7 @@ describe('App shell', () => {
       'Home',
       'Upload',
       'Subscriptions',
+      'Watch history',
     ]);
     expect(fixture.nativeElement.textContent).toContain('No videos are ready yet');
 

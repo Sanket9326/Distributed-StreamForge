@@ -3,6 +3,12 @@ import { authGuard } from './auth/auth.guard';
 
 export const routes: Routes = [
   {
+    path: 'watch-history',
+    loadComponent: () => import('./history/watch-history.page').then((module) => module.WatchHistoryPage),
+    canActivate: [authGuard],
+    title: 'Watch history · StreamForge',
+  },
+  {
     path: 'subscriptions',
     loadComponent: () =>
       import('./subscriptions/subscriptions.page').then((module) => module.SubscriptionsPage),

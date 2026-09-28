@@ -71,8 +71,11 @@ topics and the rendition bucket must already exist.
 
 Before starting Engagement outside Compose, supply
 `ConnectionStrings__EngagementDatabase`, `ConnectionStrings__Redis`,
-`Kafka__BootstrapServers`, and `Feed__BaseAddress`. Engagement creates its two
-output topics and consumes the completed-video topic.
+`Kafka__BootstrapServers`, `Feed__BaseUrl`, and `Identity__BaseUrl`. Engagement creates reaction,
+view, subscription, and watch-history topics plus the subscription/history
+dead-letter topics, and consumes the completed-video topic. Watch history uses
+three fixed partitions by default. See the
+[history runbook](../operations/runbooks/watch-history.md) before changing that setting.
 
 Before starting Search outside Compose, supply `Elasticsearch__Endpoint` and
 `Kafka__BootstrapServers`. Elasticsearch, `video-search-index`, and Kafka must
@@ -223,6 +226,9 @@ docker compose --env-file .env -f infra/docker/compose.yml down --volumes
 | Engagement | `ConnectionStrings:EngagementDatabase` | Required; isolated `engagement` schema |
 | Engagement | `ConnectionStrings:Redis` | Required rebuildable projection store |
 | Engagement | `Kafka:ReactionTopic` / `ViewTopic` | `video-engagement-reactions` / `video-engagement-views` |
+| Engagement | `Kafka:WatchHistoryTopic` / `WatchHistoryDeadLetterTopic` | `user-watch-history` / `user-watch-history-dead-letter` |
+| Engagement | `Kafka:WatchHistoryConsumerGroupId` | `streamforge-engagement-watch-history-v1` |
+| Engagement | `Kafka:WatchHistoryPartitionCount` | `3`; fixed after topic creation |
 | Engagement | `Engagement:ViewFlushSeconds` / `ViewFlushSize` | `300` / `10000` |
 | Playback | `ConnectionStrings:PlaybackDatabase` | Required; isolated `playback` schema |
 | Playback | `Kafka:ConsumerGroupId` | `streamforge-playback-v1` |
@@ -258,3 +264,20 @@ and login/registration screenshots. HLS playback tests generate synthetic media
 with host FFmpeg or the built Transcoding image, register a disposable test account, upload, and exercise adaptive
 playback. Test accounts and videos remain in local volumes. Screenshots are
 written under artifacts/screenshots; test output and generated media are ignored.
+
+The watch-history suite uses controlled API responses and real synthetic MP4/HLS
+media to cover resume, completion, quality changes, fallback, failed saves,
+logout, guest access, and desktop/mobile layouts. It can run against the served
+Web app without backend services; generation requires host FFmpeg or the built
+Transcoding image and Docker. To run that suite and subscription regressions:
+
+```powershell
+npm run test:e2e -- watch-history.spec.ts subscriptions.spec.ts --workers=1
+```
+
+Set `STREAMFORGE_BASE_URL` when the served app uses a different local address.
+With `STREAMFORGE_E2E=1`, the HLS suite also verifies watch-history acceptance and
+resume through the actual authenticated Gateway, Kafka, Redis, and PostgreSQL
+stack after uploading a synthetic video. See the
+[watch-history runbook](../operations/runbooks/watch-history.md) for rollout and
+the deliberately deferred durability improvements.

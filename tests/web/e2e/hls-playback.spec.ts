@@ -54,7 +54,7 @@ test.describe("full Compose adaptive HLS playback", () => {
   });
   test.afterAll(() => rmSync(artifacts, { recursive: true, force: true }));
 
-  test("uploads, adapts, switches quality, and falls back when HLS is unavailable", async ({
+  test("uploads, adapts, saves and resumes history, and falls back when HLS is unavailable", async ({
     page,
     context,
   }) => {
@@ -126,6 +126,26 @@ test.describe("full Compose adaptive HLS playback", () => {
     await expect
       .poll(() => requested.slice(before).some((url) => url.includes("/720p/")), { timeout: 30_000 })
       .toBeTruthy();
+
+    // Exercise the real authenticated Gateway -> Kafka -> Redis/PostgreSQL history path.
+    const videoId = new URL(page.url()).pathname.split("/").at(-1)!;
+    await player.evaluate(async (video: HTMLVideoElement) => { video.currentTime = 8; await video.play(); });
+    await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.seeking)).toBe(false);
+    const savedProgress = page.waitForResponse((response) =>
+      response.request().method() === "PUT" &&
+      new URL(response.url()).pathname === `/api/engagement/watch-history/${videoId}` &&
+      response.request().postDataJSON().isCompleted === false);
+    await player.evaluate((video: HTMLVideoElement) => video.pause());
+    const saved = await savedProgress;
+    expect(saved.status()).toBe(202);
+    const progress = (await saved.json()).progress;
+    expect(progress.positionMs).toBeGreaterThanOrEqual(8000);
+    expect(progress.isCompleted).toBe(false);
+    await page.goto("/watch-history");
+    await expect(page.getByRole("heading", { name: "Watch history", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: `Watch ${title}`, exact: true }).click();
+    await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime),
+      { timeout: 30_000 }).toBeGreaterThanOrEqual(progress.positionMs / 1000);
 
     const like = page.getByRole("button", { name: "Like video", exact: true });
     await like.click();

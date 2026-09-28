@@ -12,7 +12,8 @@
         (playing)="onPlaying()"
         (pause)="onPause()"
         (waiting)="onWaiting()"
-        (ended)="onPause()"
+        (ended)="onEnded()"
+        (loadedmetadata)="onLoadedMetadata()"
         (timeupdate)="onTimeUpdate()"
         (volumechange)="onVolumeChange()"
         (error)="onPlaybackError()"
@@ -78,6 +79,7 @@
       }
     </div>
 
+    @if (historyNotice()) { <p class="history-notice" role="status">{{ historyNotice() }}</p> }
     <h1 class="watch-title">{{ video().title }}</h1>
 
     <div class="watch-toolbar">

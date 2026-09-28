@@ -1,0 +1,28 @@
+<main class="history-page">
+  <header><p class="eyebrow">Your library</p><h1>Watch history</h1><p>Pick up where you left off.</p></header>
+  @if (error()) {
+    <div class="history-state" role="alert">{{ error() }} <button type="button" (click)="load(entries().length > 0)">Retry</button></div>
+  }
+  @if (entries().length) {
+    <section class="history-grid" aria-label="Previously watched videos">
+      @for (entry of entries(); track entry.progress.videoId) {
+        <article class="history-entry">
+          @if (entry.video; as video) {
+            <app-video-card [video]="video" appearance="grid" [creatorName]="creator(video)" (watchRequested)="open($event)" />
+          } @else {
+            <div class="unavailable"><span aria-hidden="true">▷</span><h2>Video unavailable</h2><p>This video can no longer be played.</p></div>
+          }
+          <div class="progress-details">
+            <progress [value]="entry.progress.positionMs" [max]="entry.progress.durationMs" aria-label="Saved watch progress"></progress>
+            <div><strong>{{ entry.progress.isCompleted ? 'Completed · Watch again' : 'Resume at ' + time(entry.progress.positionMs) }}</strong><span>{{ time(entry.progress.durationMs) }}</span></div>
+            <time [attr.datetime]="entry.progress.updatedAtUtc">Watched {{ date(entry.progress.updatedAtUtc) }}</time>
+          </div>
+        </article>
+      }
+    </section>
+  } @else if (!loading() && !error()) {
+    <section class="history-state"><h2>Your watch history starts here</h2><p>Videos you play while logged in will appear here when you pause or leave.</p><a routerLink="/">Find something to watch</a></section>
+  }
+  @if (loading()) { <div class="history-state" role="status" aria-busy="true">Loading watch history…</div> }
+  @if (cursor() && !loading() && !error()) { <button class="load-more" type="button" (click)="load(true)">Load more</button> }
+</main>

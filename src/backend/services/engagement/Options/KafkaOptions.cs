@@ -10,6 +10,10 @@ public sealed class KafkaOptions
     public string SubscriptionDeadLetterTopic { get; init; } = "user-engagement-subscriptions-dead-letter";
     public string SubscriptionConsumerGroupId { get; init; } = "streamforge-engagement-subscriptions-v1";
     public string CompletedTopic { get; init; } = "video-transcoding-completed";
+    public string WatchHistoryTopic { get; init; } = "user-watch-history";
+    public string WatchHistoryDeadLetterTopic { get; init; } = "user-watch-history-dead-letter";
+    public string WatchHistoryConsumerGroupId { get; init; } = "streamforge-engagement-watch-history-v1";
+    public int WatchHistoryPartitionCount { get; init; } = 3;
     public string ReactionConsumerGroupId { get; init; } = "streamforge-engagement-reactions-v1";
     public string ViewConsumerGroupId { get; init; } = "streamforge-engagement-views-v1";
     public string CatalogConsumerGroupId { get; init; } = "streamforge-engagement-catalog-v1";

@@ -253,6 +253,10 @@ services:
       Kafka__SubscriptionTopic: user-engagement-subscriptions
       Kafka__SubscriptionDeadLetterTopic: user-engagement-subscriptions-dead-letter
       Kafka__SubscriptionConsumerGroupId: streamforge-engagement-subscriptions-v1
+      Kafka__WatchHistoryTopic: user-watch-history
+      Kafka__WatchHistoryDeadLetterTopic: user-watch-history-dead-letter
+      Kafka__WatchHistoryConsumerGroupId: streamforge-engagement-watch-history-v1
+      Kafka__WatchHistoryPartitionCount: "3"
       Kafka__CompletedTopic: video-transcoding-completed
       Kafka__ReactionConsumerGroupId: streamforge-engagement-reactions-v1
       Kafka__ViewConsumerGroupId: streamforge-engagement-views-v1

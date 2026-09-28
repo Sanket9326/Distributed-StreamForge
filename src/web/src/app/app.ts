@@ -4,6 +4,7 @@ import { UploadCompletionService } from './upload-completion.service';
 import { AuthService } from './auth/auth.service';
 import { Router } from '@angular/router';
 import { VideoSearchComponent } from './search/video-search.component';
+import { WatchHistoryService } from './history/watch-history.service';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,7 @@ export class App {
     localStorage.getItem('streamforge-sidebar-collapsed') === '1',
   );
   private readonly router = inject(Router);
+  private readonly history = inject(WatchHistoryService);
 
   constructor() {
     void this.auth.initialize();
@@ -25,6 +27,7 @@ export class App {
 
   protected async logout(): Promise<void> {
     try {
+      await this.history.flushBeforeLogout();
       await this.auth.logout();
       await this.router.navigateByUrl('/');
     } catch {
